@@ -1,0 +1,27 @@
+---
+title: "Basic Exploratory Analysis"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+library("knitr")
+opts_chunk$set(cache = T)
+read_chunk("exploratory.R")
+```
+
+```{r, libraries}
+```
+
+```{r, filter-data}
+```
+
+```{r, user-plots}
+```
+
+```{r, user-pairwise}
+```
