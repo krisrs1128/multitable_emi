@@ -4,7 +4,6 @@
 // https://speakerd.s3.amazonaws.com/presentations/501d641214507500020491a3/MusicHackathonShanda.pdf
 ////////////////////////////////////////////////////////////////////////////////
 
-
 #include <RcppArmadillo.h>
 
 // [[Rcpp::depends(RcppArmadillo)]]
