@@ -96,3 +96,12 @@ words_model <- caret::train(x = x, y = y, method = "rf",
 words_model
 
 # ---- merge-everything ----
+train_all <- merge(train_words, users, by = "User", all.x = T)
+dim(train_all)
+
+x <- expand_factors(train_all[, setdiff(colnames(train_all), "User"), with = F])
+x[, "Rating":=NULL]
+x <- preprocess_data(as.matrix(x))
+y <- train_all$Rating
+all_model <- caret::train(x = x, y = y, method = "glmnet",
+                          trControl = trControl)
