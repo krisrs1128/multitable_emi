@@ -5,6 +5,7 @@
 
 # load libraries
 library("emi")
+library("devtools")
 library("data.table")
 
 # extract data excluding keys
@@ -26,3 +27,6 @@ na_counts <- as.numeric(table(y))
 na_counts
 na_patterns
 image(as.matrix(na_patterns))
+
+words_na_ix <- as.numeric(as.factor(y))
+use_data(words_na_ix)
