@@ -4,7 +4,7 @@
 \alias{get_folds}
 \title{Get CV Folds for evaluation}
 \usage{
-get_folds(data = NULL, file = NULL, n = 188690, K = 5, n_rep = 20)
+get_folds(n = 188690, K = 5, n_rep = 1)
 }
 \description{
 Get CV Folds for evaluation
