@@ -15,11 +15,54 @@ RMSE <- function(y, y_hat) {
 #' @importFrom caret createFolds
 #' @importFrom devtools use_data
 #' @export
-get_folds <- function(n = 188690, K = 5, n_rep = 20) {
-  replicate(n_rep, createFolds(seq_len(nrow(train)), k = K), simplify = T)
+get_folds <- function(n = 188690, K = 5, n_rep = 1) {
+  replicate(n_rep, createFolds(seq_len(n), k = K), simplify = T)
 }
 
 # evaluation -------------------------------------------------------------------
-evaluate_model <- function(data_list, train_fun, pred_fun) {
+#' @title Generic Evaluation Function
+#' @param data_list A list containing the following elements, paralleling the
+#' input provided by Kaggle,\cr
+#'   train: A data.frame giving the artist, track, user, rating, and time info. \cr
+#'   words: A matrix giving word indicators for artist-user pairs. \cr
+#'   users: A matrix givin gsurvey results for each user. \cr
+#' @param train_fun A function taking arguments data_list and train_opts, and
+#' returning a trained model that can be used for prediction.
+#' @param train_opts A list giving options for how to train the model in
+#' train_fun.
+#' @param pred_fun A function that given the output of train_fun and a new test
+#' version of data_list returns predictions for each row of the test data.
+#' @param K The number of cv-folds in cross-validation.
+#' @param n_rep The number of cv replicates to perform.
+#' @return A list with the following elements, \cr
+#'    mean_rmse: The mean of the RMSEs calculated over reps and folds.
+#'    err: A K x n_rep matrix, whose kj^th element gives the error when holding
+#'    out the k^th fold in the j^th rep.
+#' @export
+evaluate <- function(data_list, train_fun, train_opts, pred_fun,
+                     K = 5, n_rep = 1) {
+  # extract cv folds
+  folds_ix <- get_folds(nrow(data_list$train), K, n_rep)
+  errs <- matrix(NA, nrow(folds_ix), ncol(folds_ix))
 
+  # loop over reps and fold indices
+  for(cur_rep in seq_len(n_rep)) {
+    for(cur_k in seq_len(K)) {
+
+      cat(sprintf("Starting fold %g of rep %g \n", cur_k, cur_rep))
+
+      # get current training and testing data
+      train_ix <- unlist(folds_ix[-cur_k, cur_rep])
+      train_data_list <- data_list
+      test_data_list <- data_list
+      train_data_list$train <- train_data_list$train[train_ix, ]
+      test_data_list$train <- test_data_list$train[-train_ix, ]
+
+      # train and evaluate model
+      cur_model <- train_fun(train_data_list, train_opts)
+      cur_preds <- pred_fun(cur_model, test_data_list)
+      errs[cur_k, cur_rep] <- RMSE(cur_preds, train[-train_ix, "Rating", with = F])
+    }
+  }
+  return (list(mean_rmse = mean(errs), errs = errs))
 }
