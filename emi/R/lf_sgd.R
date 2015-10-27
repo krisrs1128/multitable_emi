@@ -18,6 +18,7 @@ merge_lf_sgd_opts <- function(opts = list()) {
   default_opts$iter_max <- 1e6
   default_opts$eta <- 0.005
   default_opts$lambdas <- rep(5, 4)
+  default_opts$d <- 5
   modifyList(default_opts, opts)
 }
 
@@ -63,10 +64,11 @@ lf_sgd_predict <- function(model, data_list) {
   # train model, with NAs in the positions to predict
   mu <- mean(R, na.rm = T)
   obs_ix <- which(!is.na(R), arr.ind = T)
-  sgd_res <- lf_sgd(R - mu, obs_ix,
-                    model$train_opts$lambdas,
-                    model$train_opts$iter_max,
-                    model$train_opts$eta)
+  sgd_res <- lf_sgd(R = R - mu, obs_ix = obs_ix,
+                    lambdas = model$train_opts$lambdas,
+                    eta = model$train_opts$eta,
+                    iter_max = model$train_opts$iter_max,
+                    d = model$train_opts$d)
 
   # make predictions
   R_hat <- mu + sgd_res$bu %*% matrix(1, 1, ncol(R)) +
