@@ -11,7 +11,7 @@ mean_model(data_list, train_opts = list(type = "User"))
 input provided by Kaggle,\cr
   train: A data.table giving the artist, track, user, rating, and time info. \cr
   words: A data.table giving word indicators for artist-user pairs. \cr
-  users: A data.table givin gsurvey results for each user. \cr
+  users: A data.table giving survey results for each user. \cr
 We don't ever actually use words or users in this model. This convention is
 enforced for simplicity only.}
 

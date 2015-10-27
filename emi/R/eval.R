@@ -38,12 +38,15 @@ get_folds <- function(n = 188690, K = 5, n_rep = 1) {
 #'    mean_rmse: The mean of the RMSEs calculated over reps and folds.
 #'    err: A K x n_rep matrix, whose kj^th element gives the error when holding
 #'    out the k^th fold in the j^th rep.
+#'    pred_pairs: A K x n_rep matrix whose kj^th element is a list with the true
+#'    and predicted ratings.
 #' @export
 evaluate <- function(data_list, train_fun, train_opts, pred_fun,
                      K = 5, n_rep = 1) {
   # extract cv folds
   folds_ix <- get_folds(nrow(data_list$train), K, n_rep)
   errs <- matrix(NA, nrow(folds_ix), ncol(folds_ix))
+  pred_pairs <- matrix(list(), nrow(folds_ix), ncol(folds_ix))
 
   # loop over reps and fold indices
   for(cur_rep in seq_len(n_rep)) {
@@ -61,8 +64,10 @@ evaluate <- function(data_list, train_fun, train_opts, pred_fun,
       # train and evaluate model
       cur_model <- train_fun(train_data_list, train_opts)
       cur_preds <- pred_fun(cur_model, test_data_list)
-      errs[cur_k, cur_rep] <- RMSE(cur_preds, train[-train_ix, "Rating", with = F])
+      truth <- unlist(train[-train_ix, "Rating", with = F])
+      errs[cur_k, cur_rep] <- RMSE(cur_preds, truth)
+      pred_pairs[[cur_k, cur_rep]] <- list(y = truth, y_hat = cur_preds)
     }
   }
-  return (list(mean_rmse = mean(errs), errs = errs))
+  return (list(mean_rmse = mean(errs), errs = errs, pred_pairs = pred_pairs))
 }

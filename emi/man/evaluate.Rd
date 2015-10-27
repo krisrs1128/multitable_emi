@@ -31,6 +31,8 @@ A list with the following elements, \cr
    mean_rmse: The mean of the RMSEs calculated over reps and folds.
    err: A K x n_rep matrix, whose kj^th element gives the error when holding
    out the k^th fold in the j^th rep.
+   pred_pairs: A K x n_rep matrix whose kj^th element is a list with the true
+   and predicted ratings.
 }
 \description{
 Generic Evaluation Function
