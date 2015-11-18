@@ -1,48 +1,124 @@
 
 ################################################################################
-# Traditional matrix completion usign SVD
+# Traditional matrix completion using SVD
 ################################################################################
 
-#' @importFrom data.table dcast.data.table
-#' @importFrom rARPACK svds
+#' @title Default options for SVD predictions
+#' @param opts A partially specified list of options to use when performing the
+#' SVD imputation. The currently supported options are
+#'   $alpha The rescaling parameter to apply after taking the SVD [to account
+#'    for the many 0's in the matrix on which we take the SVD]
+#'   $k The rank of the imputation. Defaults to 10.
+#'   $keep_cols The columns of the "tall" training data that will be "cast"
+#'   $max_val The top value to truncate predictions at.
+#'   $min_val THe bottom value to truncate predictions at.
 #' @export
-svd_predictor <- function(train, test, r = 5, alpha = 0.7) {
-  # reshape to be user x artist matrix
-  train_mat <- dcast.data.table(train, User ~ Artist,
-                                value.var = "Rating", fun.aggregate = mean,
-                                drop = FALSE)
-  rownames(train_mat) <- train_mat$User
-  train_mat <- train_mat[, User:=NULL]
+merge_svd_opts <- function(opts = list()) {
+  default_opts <- list()
+  default_opts$alpha <- NULL
+  default_opts$k <- 10
+  default_opts$keep_cols <- c("User", "Track")
+  default_opts$max_val <- 100
+  default_opts$min_val <- 0
+  modifyList(default_opts, opts)
+}
 
-  # compute deviations from user means
-  Mt <- scale(t(train_mat), scale = FALSE)
-  M <- t(Mt)
-  user_means <- attr(Mt, "scaled:center")
-  M[is.na(M)] <- 0
-  rownames(M) <- rownames(train_mat)
+#' @title Cast a ratings matrix from tall to wide
+#' @param mR A "tall" version of the usual ratings matrix. Each observed
+#' user-movie pair is a row of this matrix. The user and movie ids are the first
+#' two columns, the third is the rating associated with each observed pair.
+#' @return R The "wide", standard form of the ratings matrix.
+#' @importFrom data.table dcast.data.table as.data.table
+#' @export
+cast_ratings <- function(mR) {
+  cast_fmla <- formula(paste0(colnames(mR)[1], "~", colnames(mR)[2]))
+  R <- dcast.data.table(cast_fmla, data = as.data.table(mR))
+  user_names <- as.character(R[[1]])
+  movie_names <- as.character(colnames(R)[-1])
+  R <- as.matrix(R[, 1:=NULL])
+  dimnames(R) <- list(user_names, movie_names)
+  R
+}
 
-  # build predictions for deviations [using ARPACK, faster than usual SVD]
-  M <- as(M, "dgCMatrix")
-  svdM <- svds(M, k = r)
+#' @title Wrapper saving information in SVD model
+#' @description This is mainly useful so that we can use the cv evaluation
+#' functions. It just saves the data and options, actual imputation is done
+#' at prediction time.
+#' @param data_list A list containing the following elements, paralleling the
+#' input provided by Kaggle,\cr
+#'   train: A data.frame giving the artist, track, user, rating, and time info. \cr
+#'   words: A matrix giving word indicators for artist-user pairs. \cr
+#'   users: A matrix givin gsurvey results for each user. \cr
+#' @param opts A list of svd imputation options. See merge_svd_opts.
+#' @export
+svd_train <- function(data_list, opts = list()) {
+  opts <- merge_svd_opts(opts)
+  mR <- data_list$train[, c(opts$keep_cols, "Rating"), with = F]
+  list(mR = mR, opts = opts)
+}
 
-  scores <- svdM$u[, 1:r] %*% diag(svdM$d[1:r])
-  v <- svdM$v[, 1:r]
-  M_hat <- scores %*% t(v)
-  dimnames(M_hat) <- dimnames(M)
+#' @title Perform core SVD imputation
+#' @param R A users x ratings rating matrix, with NAs whenever a rating is
+#' unknown.
+#' @param k The rank of the SVD approximation to use.
+#' @param alpha The rescaling factor after performing imputation, to account for
+#' the many 0's in the originally SVD'd matrix.
+#' @param min_val The minimum value to truncate predictions at.
+#' @param max_val The maximum value to truncate predictions at.
+#' @return pR_hat The version of R with imputations filled in.
+#' @importFrom irlba irlba
+#' @importFrom Matrix sparseMatrix
+#' @export
+svd_impute <- function(R, k, alpha, min_val, max_val) {
+  # calculate deviations from user means
+  user_means <- rowMeans(R, na.rm = T)
+  user_means[user_means == 0] <- mean(R, na.rm = T) # when a user has no ratings, don't want mean to be 0
+  user_means_mat <- matrix(user_means) %*% rep(1, ncol(R))
+  R <- R - user_means_mat
 
-  # many users in the training data are not in the test for these users, just
-  # use the global mean.
-  new_users <- setdiff(as.character(unique(test$User)), rownames(M_hat))
-  M_new_users <- matrix(0, nrow = length(new_users), ncol = ncol(M_hat),
-                        dimnames = list(new_users, colnames(M_hat)))
-  M_hat <- rbind(M_hat, M_new_users)
-  new_means <- rep(mean(train$Rating), length(new_users))
-  user_means <- c(user_means, new_means)
-  names(user_means) <- c(rownames(train_mat), new_users)
+  # automatic scaling factor, if not provided
+  if(is.null(alpha)) {
+    alpha <- prod(dim(R)) / sum(!is.na(R))
+  }
 
-  # make predictions using means for the users + deviations coming from SVD
-  y_hat <- M_hat[as.matrix(test[, c("User", "Artist"), with = F])] +
-    (1 - alpha) * user_means[as.character(test$User)] + alpha * mean(user_means)
-  return (list(y_hat = y_hat, svd = svdM, M_hat = M_hat,
-               user_means = user_means))
+  # perform svd approximation
+  R[is.na(R)] <- 0
+  svdR <- irlba(as(R, "sparseMatrix"), nu = 5, nv = 5)
+  pR <- alpha * svdR$u %*% diag(svdR$d) %*% t(svdR$v)
+  pR_hat <- pR + user_means_mat
+
+  # truncate to possible range
+  pR_hat[pR_hat < min_val] <- min_val
+  pR_hat[pR_hat > max_val] <- max_val
+  dimnames(pR_hat) <- dimnames(R)
+  pR_hat
+}
+
+#' @title Matrix completion predictions using the SVD
+#' @param trained_model The output of svd_train()
+#' @param newdata A new data_list of the same form as data_list in the input to
+#' svd_train()
+#' @return y_hat Predictions y_hat for every new user-track pair in the newdata.
+#' @importFrom data.table as.data.table melt.data.table setnames
+#' @export
+svd_predict <- function(trained_model, newdata) {
+  # merge train and test, and reshape data to wide
+  opts <- trained_model$opts
+  mR_test <- as.data.table(newdata$train[, opts$keep_cols, with = F], Rating = 0)
+  mR <- rbind(trained_model$mR, mR_test)
+  R <- cast_ratings(mR)
+
+  # get imputation results
+  R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
+  test_users <- unique(newdata$train[[opts$keep_cols[1]]])
+  mR_hat <- melt.data.table(as.data.table(R_hat[test_users, ], keep.rownames = TRUE))
+  setnames(mR_hat, c(opts$keep_cols, "Rating"))
+
+  # filter down to the predictions on the test cases
+  y_hat <- merge(newdata$train, mR_hat, by = opts$keep_cols,
+                 all.x = TRUE, all.y = FALSE, sort = F) %>%
+                   select_("Rating") %>%
+                   unlist(use.names = FALSE)
+  y_hat[is.na(y_hat)] <- mean(trained_model$mR$Rating, na.rm = T)
+  y_hat
 }
