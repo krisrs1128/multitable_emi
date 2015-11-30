@@ -5,6 +5,7 @@
 
 ## ---- libraries ----
 library("abind")
+library("reshape2")
 library("data.table")
 library("plyr")
 library("dplyr")
@@ -15,7 +16,7 @@ data(train)
 data(words)
 data(users)
 
-train <- train[1:10000, ]
+train <- train[1:1000, ]
 
 # convert to matrix with rownames
 X <- dcast(train, User ~ Track, value.var = "Rating", fill = NA)
@@ -25,37 +26,42 @@ rownames(X2) <- unlist(X[, 1, with = F])
 X <- X2
 rm(X2)
 
-# construct feature matrix describing the users
-Z_users <- array(0, c(nrow(X), ncol(X), ncol(users) - 1))
-dimnames(Z_users) <- list(rownames(X), colnames(X), colnames(users)[-1])
-
-for(j in seq_len(ncol(users))[-1]) {
-  cat(sprintf("Creating feature %g \n", j))
-  match_ix <- match(rownames(Z_users), as.character(users$User))
-  Z_users[,, j - 1] <- unlist(users[match_ix, j, with = F])
-}
-
-track_artist_map <- train[, c("Artist", "Track"), with = F] %>%
-  distinct()
-
 # construct feature matrix describing user x track combinations
-mwords <- melt(words)
-variables <- unique(mwords$variable)
-Z_pairs <- vector(length = length(variables) - 2, mode = "list")
-for(j in seq_along(variables)) {
-  cur_words <- filter(mwords, variable == variables[j])
-  Z_pairs[[j]] <- dcast(cur_words, User ~ Artist)
-}
+mwords <- words %>%
+  filter(User %in% train$User) %>%
+  melt(id.vars = c("Artist", "User")) %>%
+  arrange(User, variable)
+Z_pairs <- acast(mwords, User ~ Artist ~ variable)
 
-for(j in seq_along(Z_pairs)) {
-  match_ix <- match(rownames(Z_users), as.character(unlist(Z_pairs[[j]]$User)))
-  Z_pairs[[j]] <- Z_pairs[[j]][match_ix, ]
-  Z_pairs[[j]] <- as.matrix(Z_pairs[[j]][, -1, with = F])
-}
+# construct feature matrix describing the users
+Z_users <- users %>%
+  filter(User %in% train$User) %>%
+  melt(id.vars = "User") %>%
+  acast(User ~ variable)
 
-# now abind them together
-abind_xy <- function(x, y) abind(x, y, along = 3)
-Z_pairs <- Reduce(abind_xy, Z_pairs)
-rownames(Z_pairs) <- rownames(Z_users)
+# will repeat this matrix for every artist
+Z_users_array <- array(rep(Z_users, length = dim(Z_pairs)[2]), dim = c(923, 50, 50))
+dimnames(Z_users_array) <- list(rownames(Z_users), unique(words$Artist),
+                                colnames(Z_users))
 
-Z <- abind(Z_pairs, Z_arr, along = 3)
+ix_user <- match(rownames(X), rownames(Z_users_array))
+ix_pairs <- match(rownames(X), rownames(Z_pairs))
+Z <- abind(Z_users_array[ix_user,, ], Z_pairs[ix_pairs,, ], along = 3)
+
+# now we need to associate each of these artists with one of the tracks in the
+# original ratings matrix
+artist_tracks <- train[, c("Artist", "Track"), with = F] %>%
+  distinct() %>%
+  arrange(Track)
+ix_track <- match(colnames(X), artist_tracks$Track)
+matched_artists <- artist_tracks[ix_track, "Artist", with = F] %>% unlist(use.names = F)
+Z <- Z[, matched_artists, ]
+
+# lazy person's imputation
+Z[is.na(Z)] <- 0
+
+grad_results <- lf_gd_cov(X, Z, k_factors = 3, lambas = c(1, 100, 1000),
+                          n_iter = 2, gamma = 0.001)
+grad_results$beta
+plot(grad_results$P[, 1:2])
+plot(grad_results$Q[, 1:2])
