@@ -4,7 +4,7 @@
 \alias{update_beta}
 \title{Gradient step for regression coefficient}
 \usage{
-update_beta(X, P, Q, beta, lambda, gamma)
+update_beta(X, Z, P, Q, beta, lambda, gamma)
 }
 \arguments{
 \item{X}{The ratings matrix. Unobserved entries must be marked NA. Users
