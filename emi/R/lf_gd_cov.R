@@ -18,8 +18,8 @@
 #'   $Q The learned track latent factors.
 #'   $beta The learned regression coefficients.
 #' @export
-lf_gd_cov <- function(X, Z, k_factors = 3, lambas = rep(1, 3), n_iter = 5,
-                      gamma = 0.1) {
+lf_gd_cov <- function(X, Z, k_factors = 3, lambdas = rep(1, 3), n_iter = 5,
+                      gamma_pq = 0.1, gamma_beta = 0.0001) {
   m <- nrow(X)
   n <- ncol(X)
   l <- dim(Z)[3]
@@ -27,23 +27,26 @@ lf_gd_cov <- function(X, Z, k_factors = 3, lambas = rep(1, 3), n_iter = 5,
   # initialize results
   P <- matrix(rnorm(m * k_factors), m, k_factors)
   Q <- matrix(rnorm(n * k_factors), n, k_factors)
-  beta <- rnorm(l)
+  #beta <- rnorm(l)
+  beta <- rep(0, l)
+  objs <- vector(length = n_iter)
 
   for(cur_iter in seq_len(n_iter)) {
     cat(sprintf("iteration %g \n", cur_iter))
 
    # update user factors, movie factors, the regression coefficients
     for(i in seq_len(m)) {
-      P[i, ] <- update_factor(X[i, ], Z[i,, ], P[i, ], Q, beta, lambdas[1], gamma)
+      P[i, ] <- update_factor(X[i, ], Z[i,, ], P[i, ], Q, beta, lambdas[1], gamma_pq)
     }
     for(j in seq_len(n)) {
-      Q[j, ] <- update_factor(X[, j], Z[, j, ], Q[j, ], P, beta, lambdas[2], gamma)
+      Q[j, ] <- update_factor(X[, j], Z[, j, ], Q[j, ], P, beta, lambdas[2], gamma_pq)
     }
-    beta <- update_beta(X, P, Q, beta, lambdas[3], gamma)
-    cat(sprintf("Objective: %g \n", objective_fun(X, Z, P, Q, beta, lambdas)))
+    beta <- update_beta(X, Z, P, Q, beta, lambdas[3], gamma_beta)
+    objs[cur_iter] <- objective_fun(X, Z, P, Q, beta, lambdas)
+    cat(sprintf("Objective: %g \n", objs[cur_iter]))
   }
 
-  return (list(P = P, Q = Q, beta = beta))
+  return (list(P = P, Q = Q, beta = beta, objs = objs))
 }
 
 #' @title Gradient step for Latent Factors
@@ -61,8 +64,9 @@ lf_gd_cov <- function(X, Z, k_factors = 3, lambas = rep(1, 3), n_iter = 5,
 update_factor <- function(x, z, p_i, Q, beta, lambda, gamma) {
   obs_ix <- !is.na(x)
   Q_obs <- Q[obs_ix, , drop = F]
-  resid <- x[obs_ix] - Q_obs %*% p_i - z[obs_ix, , drop = F] %*% beta
-  as.numeric((1 - lambda) * p_i + lambda * gamma * t(Q_obs) %*% resid)
+  resid <- as.numeric(x[obs_ix] - Q_obs %*% p_i)
+  p_i_grad <- 2 * as.numeric(lambda * p_i - t(Q_obs) %*% resid)
+  p_i - gamma * p_i_grad
 }
 
 #' @title Gradient step for regression coefficient
@@ -75,7 +79,7 @@ update_factor <- function(x, z, p_i, Q, beta, lambda, gamma) {
 #' @param gamma The step-size in the gradient descent.
 #' @return The update regression coefficients.
 #' @export
-update_beta <- function(X, P, Q, beta, lambda, gamma) {
+update_beta <- function(X, Z, P, Q, beta, lambda, gamma) {
   obs_ix <- !is.na(X)
   Zbeta <- apply(Z, 2, function(x) x %*% beta)
   resid <- X - P %*% t(Q) - Zbeta
@@ -83,7 +87,8 @@ update_beta <- function(X, P, Q, beta, lambda, gamma) {
   for(l in seq_along(beta_grad)) {
     beta_grad[l] <- sum(resid[obs_ix] * Z[,, l][obs_ix])
   }
-  (1 - lambda) * beta + lambda * gamma * beta_grad
+  beta_grad <- 2 * lambda * beta - 2 * beta_grad
+  beta - gamma * beta_grad
 }
 
 #' @title Objective function to minimize
@@ -105,6 +110,6 @@ update_beta <- function(X, P, Q, beta, lambda, gamma) {
 objective_fun <- function(X, Z, P, Q, beta, lambdas) {
   obs_ix <- !is.na(X)
   Zbeta <- apply(Z, 2, function(x) x %*% beta)
-  resid <- X[obs_ix] - P %*% t(Q) - Zbeta
+  resid <- X - P %*% t(Q) - Zbeta
   sum(resid[obs_ix] ^ 2) +  lambdas %*%  c(sum(P ^ 2), sum(Q ^ 2), sum(beta ^ 2))
 }

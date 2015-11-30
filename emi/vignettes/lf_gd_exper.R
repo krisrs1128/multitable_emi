@@ -16,7 +16,8 @@ data(train)
 data(words)
 data(users)
 
-train <- train[1:1000, ]
+#train <- filter(train, Artist %in% 1:5)
+train <- train[1:50, ]
 
 # convert to matrix with rownames
 X <- dcast(train, User ~ Track, value.var = "Rating", fill = NA)
@@ -40,9 +41,8 @@ Z_users <- users %>%
   acast(User ~ variable)
 
 # will repeat this matrix for every artist
-Z_users_array <- array(rep(Z_users, length = dim(Z_pairs)[2]), dim = c(923, 50, 50))
-dimnames(Z_users_array) <- list(rownames(Z_users), unique(words$Artist),
-                                colnames(Z_users))
+Z_users_array <- array(rep(Z_users, length = dim(Z_pairs)[2]), dim = c(dim(Z_users)[1], dim(Z_pairs)[2], dim(Z_users)[2]))
+dimnames(Z_users_array) <- list(rownames(Z_users), colnames(Z_pairs), colnames(Z_users))
 
 ix_user <- match(rownames(X), rownames(Z_users_array))
 ix_pairs <- match(rownames(X), rownames(Z_pairs))
@@ -54,14 +54,18 @@ artist_tracks <- train[, c("Artist", "Track"), with = F] %>%
   distinct() %>%
   arrange(Track)
 ix_track <- match(colnames(X), artist_tracks$Track)
-matched_artists <- artist_tracks[ix_track, "Artist", with = F] %>% unlist(use.names = F)
+matched_artists <- artist_tracks[ix_track, "Artist", with = F] %>%
+  unlist(use.names = F) %>%
+  as.character()
 Z <- Z[, matched_artists, ]
 
 # lazy person's imputation
 Z[is.na(Z)] <- 0
 
-grad_results <- lf_gd_cov(X, Z, k_factors = 3, lambas = c(1, 100, 1000),
-                          n_iter = 2, gamma = 0.001)
-grad_results$beta
-plot(grad_results$P[, 1:2])
-plot(grad_results$Q[, 1:2])
+set.seed(10)
+grad_results <- lf_gd_cov(X, Z, k_factors = 3, lambdas = c(10, 10, 100),
+                          n_iter = 200, gamma_pq = 0.00001, gamma_beta = 0.0000001)
+plot(grad_results$objs)
+plot(grad_results$P)
+plot(grad_results$Q)
+plot(grad_results$beta)
