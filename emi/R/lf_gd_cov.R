@@ -4,54 +4,107 @@
 ################################################################################
 
 #' @title Regular gradient descent for latent factor model with covariates
+#' @param X The ratings matrix. Unobserved entries must be marked NA. Users
+#' must be along rows, and tracks must be along columns.
+#' @param Z The covariates associated with each pair. This must be shaped as an
+#' array with users along rows, tracks along columns, and features along
+#' slices.
+#' @param k_factors The number of latent factors for the problem.
+#' @param lambdas The regularization parameters for P, Q, and beta, respectively.
+#' @param n_iter The number of gradient descent iterations to run.
+#' @param gamma The step-size in the gradient descent.
+#' @return A list with the following elements, \cr
+#'   $P The learned user latent factors. \cr
+#'   $Q The learned track latent factors.
+#'   $beta The learned regression coefficients.
 #' @export
-lf_gd_cov <- function(X, Z, k_factors = 3, lambas = c(1, 1, 1), n_iter = 100,
+lf_gd_cov <- function(X, Z, k_factors = 3, lambas = rep(1, 3), n_iter = 5,
                       gamma = 0.1) {
   m <- nrow(X)
   n <- ncol(X)
   l <- dim(Z)[3]
 
   # initialize results
-  P <- matrix(0, m, k_factors)
-  Q <- matrix(0, n, k_factors)
-  beta <- vector(0, length = l)
+  P <- matrix(rnorm(m * k_factors), m, k_factors)
+  Q <- matrix(rnorm(n * k_factors), n, k_factors)
+  beta <- rnorm(l)
 
   for(cur_iter in seq_len(n_iter)) {
-    # update user factors, movie factors, the regression coefficients
+    cat(sprintf("iteration %g \n", cur_iter))
+
+   # update user factors, movie factors, the regression coefficients
     for(i in seq_len(m)) {
-      P[i, ] <- update_p(X[i, ], Z[i,, ], P[i, ], Q, beta, lambdas[1], gamma)
+      P[i, ] <- update_factor(X[i, ], Z[i,, ], P[i, ], Q, beta, lambdas[1], gamma)
     }
     for(j in seq_len(n)) {
-      Q[j, ] <- update_q(X[, j], Z[, j,], P, Q[j, ], beta, lambdas[2], gamma)
+      Q[j, ] <- update_factor(X[, j], Z[, j, ], Q[j, ], P, beta, lambdas[2], gamma)
     }
-    beta <- update_beta(X, P, Q, beta, lambdas[3])
+    beta <- update_beta(X, P, Q, beta, lambdas[3], gamma)
+    cat(sprintf("Objective: %g \n", objective_fun(X, Z, P, Q, beta, lambdas)))
   }
 
   return (list(P = P, Q = Q, beta = beta))
 }
 
-update_factor <- function(x, z, update_factor, other_factor, lambda, gamma) {
+#' @title Gradient step for Latent Factors
+#' @param x Either a single row or single column of X, the ratings matrix.
+#' @param z A single matrix from the covariates array, associated with the
+#' either a single row or column of X.
+#' @param p_i The latent factors associated with a single user or track.
+#' @param Q The latent factors associated with either all tracks or all users,
+#' depending on the type of latent factor in p_i.
+#' @param beta The learned regression coefficients.
+#' @param lambda The regularization parameter for the current latent factor.
+#' @param gamma The step-size in the gradient descent.
+#' @return The update latent factor for the current user / track.
+#' @export
+update_factor <- function(x, z, p_i, Q, beta, lambda, gamma) {
   obs_ix <- !is.na(x)
-  other_factor_obs <- other_factor[obs_ix, ]
-  resid <- x[obs_ix] - t(other_factor_obs) %*% udpate_factor - z[other_factor_obs, ] %*% beta
-  (1 - lambda) * update_factor + lambda * gamma * t(other_factor_obs) %*% resid
+  Q_obs <- Q[obs_ix, , drop = F]
+  resid <- x[obs_ix] - Q_obs %*% p_i - z[obs_ix, , drop = F] %*% beta
+  as.numeric((1 - lambda) * p_i + lambda * gamma * t(Q_obs) %*% resid)
 }
 
-update_q <- function(x_j, z_j, P, q_j, beta, lambda, gamma) {
-  update_factor(x_j, z_j, q_j, P, beta, lambda, gamma)
-}
-
-udpate_p <- function(x_i, z_i, p_i, Q, beta, lambda, gamma) {
-  update_factor(x_i, z_j, p_i, Q, beta, lambda, gamma)
-}
-
-
+#' @title Gradient step for regression coefficient
+#' @param X The ratings matrix. Unobserved entries must be marked NA. Users
+#' must be along rows, and tracks must be along columns.
+#' @param P The learned user latent factors.
+#' @param Q The learned track latent factors.
+#' @param beta The learned regression coefficients.
+#' @param lambda The regularization parameter for beta.
+#' @param gamma The step-size in the gradient descent.
+#' @return The update regression coefficients.
+#' @export
 update_beta <- function(X, P, Q, beta, lambda, gamma) {
-  obs_ix <- is.na(X)
-  resid <- X - P %*% t(Q) - Z %*% beta
+  obs_ix <- !is.na(X)
+  Zbeta <- apply(Z, 2, function(x) x %*% beta)
+  resid <- X - P %*% t(Q) - Zbeta
   beta_grad <- vector(length = length(beta))
-  for(l in seq_len(beta_grad)) {
+  for(l in seq_along(beta_grad)) {
     beta_grad[l] <- sum(resid[obs_ix] * Z[,, l][obs_ix])
   }
   (1 - lambda) * beta + lambda * gamma * beta_grad
+}
+
+#' @title Objective function to minimize
+#' @description This is the sum of squared error at observed entries,
+#' between the ratings matrix and its approximation by latent factors and
+#' covariates.
+#' @param X The ratings matrix. Unobserved entries must be marked NA. Users
+#' must be along rows, and tracks must be along columns.
+#' @param Z The covariates associated with each pair. This must be shaped as an
+#' array with users along rows, tracks along columns, and features along
+#' slices.
+#' @param P The learned user latent factors.
+#' @param Q The learned track latent factors.
+#' @param beta The learned regression coefficients.
+#' @param lambda  The regularization parameters for P, Q, and beta, respectively.
+#' @return The value of the objective function given the current parameter
+#' values.
+#' @export
+objective_fun <- function(X, Z, P, Q, beta, lambdas) {
+  obs_ix <- !is.na(X)
+  Zbeta <- apply(Z, 2, function(x) x %*% beta)
+  resid <- X[obs_ix] - P %*% t(Q) - Zbeta
+  sum(resid[obs_ix] ^ 2) +  lambdas %*%  c(sum(P ^ 2), sum(Q ^ 2), sum(beta ^ 2))
 }
