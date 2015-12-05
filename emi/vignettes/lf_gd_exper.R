@@ -65,8 +65,9 @@ Z[is.na(Z)] <- 0
 #                          gamma_beta = 1e-8)
 
 grad_results <- lf_gd_cov(X, Z, k_factors = 2, lambdas = c(10, 10, 100),
-                          n_iter = 10, batch_p = .1, gamma_pq = 1e-4,
-                          gamma_beta = 1e-8)
+                          n_iter = 10, batch_factors = 1, batch_samples = .01,
+                          gamma_pq = 1e-4, gamma_beta = 1e-8)
+
 
 plot(log(grad_results$objs))
 plot(grad_results$P)
