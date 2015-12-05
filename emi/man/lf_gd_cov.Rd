@@ -4,7 +4,8 @@
 \alias{lf_gd_cov}
 \title{Regular gradient descent for latent factor model with covariates}
 \usage{
-lf_gd_cov(X, Z_vec, k_factors, lambdas, n_iter, gamma_pq, gamma_beta)
+lf_gd_cov(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors,
+  gamma_pq, gamma_beta)
 }
 \arguments{
 \item{X}{The ratings matrix. Unobserved entries must be marked NA. Users
@@ -15,6 +16,12 @@ must be along rows, and tracks must be along columns.}
 \item{lambdas}{The regularization parameters for P, Q, and beta, respectively.}
 
 \item{n_iter}{The number of gradient descent iterations to run.}
+
+\item{batch_samples}{The proportion of the observed entries to sample in the
+gradient for each factor in the gradient descent.}
+
+\item{batch_factors}{The proportion of latent factors to update at each
+iteration.}
 
 \item{Z}{The covariates associated with each pair. This must be shaped as an
 array with users along rows, tracks along columns, and features along

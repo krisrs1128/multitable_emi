@@ -4,7 +4,7 @@
 \alias{update_factor}
 \title{Gradient step for Latent Factors}
 \usage{
-update_factor(x, z, p_i, Q, beta, lambda, gamma)
+update_factor(x, z, p_i, Q, beta, lambda, batch_samples, gamma)
 }
 \arguments{
 \item{x}{Either a single row or single column of X, the ratings matrix.}
@@ -20,6 +20,9 @@ depending on the type of latent factor in p_i.}
 \item{beta}{The learned regression coefficients.}
 
 \item{lambda}{The regularization parameter for the current latent factor.}
+
+\item{batch_samples}{The proportion of the observed entries to sample in the
+gradient for each factor in the gradient descent.}
 
 \item{gamma}{The step-size in the gradient descent.}
 }
