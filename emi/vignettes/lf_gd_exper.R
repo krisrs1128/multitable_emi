@@ -15,7 +15,7 @@ library("emi")
 data(train)
 data(words)
 data(users)
-train <- train[1:1000, ]
+train <- train[1:10000, ]
 
 # convert to matrix with rownames
 X <- dcast(train, User ~ Track, value.var = "Rating", fill = NA)
@@ -60,8 +60,14 @@ Z <- Z[, matched_artists, ]
 # lazy person's imputation
 Z[is.na(Z)] <- 0
 
+#grad_results <- lf_gd_cov(X, Z, k_factors = 2, lambdas = c(10, 10, 100),
+#                          n_iter = 100, batch_p = 1, gamma_pq = 1e-4,
+#                          gamma_beta = 1e-8)
+
 grad_results <- lf_gd_cov(X, Z, k_factors = 2, lambdas = c(10, 10, 100),
-                          n_iter = 100, gamma_pq = 1e-4, gamma_beta = 1e-8)
+                          n_iter = 10, batch_p = .1, gamma_pq = 1e-4,
+                          gamma_beta = 1e-8)
+
 plot(log(grad_results$objs))
 plot(grad_results$P)
 plot(grad_results$Q)

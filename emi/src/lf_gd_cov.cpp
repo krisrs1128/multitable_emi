@@ -6,6 +6,7 @@
 #include <RcppArmadillo.h>
 #include <math.h>
 #include <stdio.h>
+#include <vector>
 
 // [[Rcpp::depends(RcppArmadillo)]]
 using namespace Rcpp;
@@ -21,6 +22,19 @@ arma::mat cube_multiply(arma::cube Z, arma::vec beta) {
   return Zbeta;
 }
 
+//[[Rcpp::export]]
+arma::uvec get_batch_ix(int n, double p) {
+  // initialize
+  Rcpp::NumericVector all_ix(n);
+  for(int i = 0; i < n; i++) {
+    all_ix(i) = i;
+  }
+
+  // keep required proportion
+  std::random_shuffle(all_ix.begin(), all_ix.end());
+  return Rcpp::as<arma::uvec>(all_ix);
+}
+
 // gradients -------------------------------------------------------------------
 //' @title Gradient step for Latent Factors
 //' @param x Either a single row or single column of X, the ratings matrix.
@@ -31,26 +45,38 @@ arma::mat cube_multiply(arma::cube Z, arma::vec beta) {
 //' depending on the type of latent factor in p_i.
 //' @param beta The learned regression coefficients.
 //' @param lambda The regularization parameter for the current latent factor.
+//' @param batch_p The proportion of the observed entries to sample in the
+//' stochastic gradient descent.
 //' @param gamma The step-size in the gradient descent.
 //' @return The update latent factor for the current user / track.
 //' @export
 // [[Rcpp::export]]
 arma::vec update_factor(arma::vec x, arma::mat z, arma::vec p_i, arma::mat Q,
-			arma::vec beta, double lambda, double gamma) {
+			arma::vec beta, double lambda, double batch_p,
+			double gamma) {
+  // subset to SGD rows with observed entries
   arma::uvec obs_ix = arma::conv_to<arma::uvec>::from(arma::find_finite(x));
   arma::mat Q_obs = Q.rows(obs_ix);
-  arma::vec resid = x(obs_ix) - Q_obs * p_i;
+  arma::vec x_obs = x(obs_ix);
+
+  arma::uvec batch_ix = get_batch_ix(x_obs.n_elem, batch_p);
+
+  if(batch_ix.n_elem > 0) {
+    x_obs = x_obs(batch_ix);
+    Q_obs = Q_obs.rows(batch_ix);
+  }
+
+  arma::vec resid = x_obs - Q_obs * p_i;
   arma::vec p_i_grad = 2 * (lambda * p_i - Q_obs.t() * resid);
   return  p_i - gamma * p_i_grad;
 }
-
 
 // @title Gradient step for regression coefficient
 // @param X The ratings matrix. Unobserved entries must be marked NA. Users
 // must be along rows, and tracks must be along columns.
 // @param P The learned user latent factors.
 // @param Q The learned track latent factors.
-//@param beta The learned regression coefficients.
+// @param beta The learned regression coefficients.
 // @param lambda The regularization parameter for beta.
 // @param gamma The step-size in the gradient descent.
 // @return The update regression coefficients.
@@ -102,6 +128,8 @@ double objective_fun(arma::mat X, arma::cube Z, arma::mat P, arma::mat Q, arma::
 //' @param k_factors The number of latent factors for the problem.
 //' @param lambdas The regularization parameters for P, Q, and beta, respectively.
 //' @param n_iter The number of gradient descent iterations to run.
+//' @param batch_p The proportion of the observed entries to sample in the
+//' stochastic gradient descent.
 //' @param gamma The step-size in the gradient descent.
 //' @return A list with the following elements, \cr
 //'   $P The learned user latent factors. \cr
@@ -111,7 +139,7 @@ double objective_fun(arma::mat X, arma::cube Z, arma::mat P, arma::mat Q, arma::
 // [[Rcpp::export]]
 Rcpp::List lf_gd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
 		     int k_factors, Rcpp::NumericVector lambdas, int n_iter,
-		     double gamma_pq, double gamma_beta) {
+		     double batch_p, double gamma_pq, double gamma_beta) {
 
   // convert to arma
   Rcpp::IntegerVector Z_dim = Z_vec.attr("dim");
@@ -135,14 +163,14 @@ Rcpp::List lf_gd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
     for(int i = 0; i < m; i++) {
       P.row(i) = update_factor(X.row(i), Z(arma::span(i), arma::span(), arma::span()),
 			       arma::conv_to<arma::vec>::from(P.row(i)), Q, beta,
-			       lambdas[0], gamma_pq).t();
+			       batch_p, lambdas[0], gamma_pq).t();
     }
 
     // update track factors
     for(int j = 0; j < n; j++) {
       Q.row(j) = update_factor(X.column(j), Z(arma::span(), arma::span(j), arma::span()),
 			       arma::conv_to<arma::vec>::from(Q.row(j)), P, beta,
-			       lambdas[1], gamma_pq).t();
+			       batch_p, lambdas[1], gamma_pq).t();
     }
 
     // update regression coefficients
