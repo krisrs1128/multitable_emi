@@ -139,7 +139,7 @@ double objective_fun(arma::mat X, arma::cube Z, arma::mat P, arma::mat Q, arma::
 //'   $beta The learned regression coefficients.
 //' @export
 // [[Rcpp::export]]
-Rcpp::List lf_gd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
+Rcpp::List svd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
 		     int k_factors, Rcpp::NumericVector lambdas, int n_iter,
 		     double batch_samples, double batch_factors,
 		     double gamma_pq, double gamma_beta) {
