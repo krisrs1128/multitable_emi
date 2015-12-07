@@ -6,6 +6,15 @@
 \usage{
 preprocess_data(X, opts = list())
 }
+\arguments{
+\item{X}{A data.frame or data.table to preprocess.}
+
+\item{opts}{A (potentially partially specified) list of preprocessing
+options. See merge_preprocess_opts for possible options, and their defaults.}
+}
+\value{
+X The processed version of X. Should have same dimensions as input.
+}
 \description{
 Preprocessing
 }
