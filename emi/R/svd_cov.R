@@ -3,20 +3,22 @@
 #  Matrix completion using regularized SVD + covariate information.
 ################################################################################
 
+# utils ------------------------------------------------------------------------
+intersect_names <- function(X, Y) {
+  intersect(colnames(X), colnames(Y))
+}
+
+merge_intersect_X <- function(X, Y) {
+  merge(X, Y, by = intersect_names(X, Y), all.x = TRUE)
+}
+
+# compilation ------------------------------------------------------------------
 # Just to make sure c++ code compiles correctly
 #' @useDynLib emi
 #' @importFrom Rcpp sourceCpp
 NULL
 
-#' @title Default options for SVD with covariates
-#' @param opts A partially specified list of options to use when performing the
-#' SVD imputation. The currently supported options are
-#' @export
-merge_svd_cov_opts <- function(opts = list()) {
-  default_opts <- list()
-  modifyList(default_opts, opts)
-}
-
+# prepare-covariates -----------------------------------------------------------
 #' @title Create an array representing covariate information
 #' @description All covariate information is provided in "long" form. That is,
 #' different user-artist-question pairs are rows of the "words" matrix. Instead,
@@ -54,7 +56,7 @@ cast_covariates <- function(mZ, x_names = NULL) {
 }
 
 #' @title Merge in user specific covariates
-#' @param We would like to include users' descriptions of their personal tastes
+#' @description We would like to include users' descriptions of their personal tastes
 #' in this regression problem. However, our regression array has the form
 #' user x artist x question, so to merge it in, we need to copy the same
 #' responses for every artist.
@@ -99,11 +101,66 @@ expand_by_track <- function(Z, track_names, artist_track_map) {
   artist_track_vec <- setNames(unlist(artist_track_map[, 1, with = F]),
                                unlist(artist_track_map[, 2, with = F]))
   artist_track_vec <- artist_track_vec[track_names]
-  Z <- Z[, artist_track_vec, ]
+  Z <- Z[, as.character(artist_track_vec), ]
   colnames(Z) <- track_names
   Z
 }
 
+#' @title Wrapper to do all the covariates preparation.
+#' @param users A matrix whose first column is a user id, and whose remaining
+#' columns give descriptions of musical preference.
+#' @param words The words data.table in directly from the EMI challenge.
+#' @param x_names An optional list of row names [character vector] to match
+#' against. This can be used to ensure consistency in the rows across tables.
+#' If a user appears in x-names but not in mZ, a new row of all NAs included.
+#' By default, the cast version of mZ is returned without any reordering of
+#' users.
+#' @param track_names The columns of the ratings matrix on which we are doing
+#' matrix completion. After applying this function, the column names of Z will
+#' be this vector.
+#' @param artist_track_map A two column data.table mapping artists (first col)
+#' to associated tracks (second col).
+#' @return A covariates matrix with dimensions user x track x question. If no
+#' response was recorded, the array element is filled with an NA.
+#' @importFrom data.table setcolorder
+#' @export
+prepare_covariates <- function(users, words, x_names, track_names,
+                               artist_track_map) {
+  mZ_words <- words %>%
+    setcolorder(c(2, 1, 3:ncol(mZ_words)))
+  cast_covariates(mZ_words, x_names) %>%
+    merge_users_covariates(users) %>%
+    expand_by_track(track_names, artist_track_map)
+}
+
+# model-fitting ----------------------------------------------------------------
+#' @title Default options for SVD with covariates
+#' @param opts A partially specified list of options to use when performing the
+#' SVD imputation. The currently supported options are
+#'  $batch_samples: The proportion of samples to use when evaluating gradients
+#'   for each user's / track's latent factors. Defaults to 1, so it is usual
+#'   gradient rather than stochastic gradient descent.
+#'  $batch_factors: The proportion of factors to update during each iteration.
+#'   Defaults to 1, so it is usual  gradient rather than stochastic gradient
+#'   descent.
+#'  $gamma_pq: The learning rate for the users and tracks factors.
+#'  $gamma_beta: The learning rate for the regression covariates.
+#'  $k_factors: How many latent factors should we use for the users and tracks?
+#'  $lambdas: Regularization parameters for user factors, track factors, and
+#'   covariates regression coefficients, respectively.
+#'  $n_iter: Number of iterations to run the (stochastic) gradient descent)
+#' @export
+merge_svd_cov_opts <- function(opts = list()) {
+  default_opts <- list()
+  default_opts$batch_samples <- 1
+  default_opts$batch_factors <- 1
+  default_opts$gamma_pq <- 1e-5
+  default_opts$gamma_beta <- 1e-8
+  default_opts$k_factors <- 5
+  default_opts$lambdas <- c(10, 10, 10)
+  default_opts$n_iter <- 5
+  modifyList(default_opts, opts)
+}
 #' @title Wrapper for saving information in SVD with covariates model
 #' @description This is mainly useful so that we can use the cv evaluation
 #' functions. It just saves the data and options, actual imputation is done
@@ -131,29 +188,50 @@ expand_by_track <- function(Z, track_names, artist_track_map) {
 #' @export
 svd_cov_train <- function(data_list, opts = list()) {
   opts <- merge_svd_cov_opts(opts)
-  mZ_words <- data_list$words %>%
-    setcolorder(c(2, 1, 3:ncol(mZ_words)))
-  artist_track_map <- unique(data_list$train[, c("Artist", "Track"), with = F])
-
-  X <- cast_ratings(data_list$train[, c("User", "Track", "Rating"), with = F])
-  Z <- cast_covariates(mZ_words, rownames(X)) %>%
-    merge_users_covariates(data_list$users) %>%
-    expand_by_track(colnames(X), artist_track_map)
-
-  list(X = X, Z = Z, opts = opts)
-}
-
-# do the actual imputation
-svd_cov_impute <- function(R, k, ...) {
-  stop("not implemented yet")
+  list(data_list = data_list, opts = opts)
 }
 
 #' @title Matrix completion predictions using the SVD
 #' @param trained_model The output of svd_train()
 #' @param newdata A new data_list of the same form as data_list in the input to
-#' svd_train()
+#' svd_cov_train() [except it doesn't need to have a "Rating" column"]
 #' @return y_hat Predictions y_hat for every new user-track pair in the newdata.
+#' @examples
+#' data(train)
+#' data(users)
+#' data(words)
+#' data_list <- list(train = train[1:100, ], words = words, users = users)
+#' newdata <- list(train = train[101:200, -5, with = F], words = words, users = users)
+#' trained_model <- svd_cov_train(data_list, list(n_iter = 5))
+#' svd_cov_predict(trained_model, newdata) # all na's, because we need to do imputation on Z
 #' @export
 svd_cov_predict <- function(trained_model, newdata) {
-  stop("not implemented yet")
+  opts <- trained_model$opts
+  train_list <- trained_model$data_list
+
+  # merge training with new data (with ratings as NAs)
+  newdata$train$Rating <- NA
+  train <- merge_intersect_X(train_list$train, newdata$train)
+  users <- merge_intersect_X(train_list$users, newdata$users)
+  words <- merge_intersect_X(train_list$words, newdata$words)
+
+  # train the model
+  artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
+  X <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
+  Z <- prepare_covariates(users, words, rownames(X), colnames(X),
+                          artist_track_map)
+  res <- svd_cov(X, Z, opts$k_factors, opts$lambdas, opts$n_iter,
+                 opts$batch_samples, opts$batch_factors, opts$gamma_pq,
+                 opts$gamma_beta)
+
+  # get the X_hat matrix
+  Zbeta <- apply(Z, 2, function(x) x %*% res$beta)
+  X_hat <- res$P %*% t(res$Q) + Zbeta
+  dimnames(X_hat) <- dimnames(X)
+
+  # filter down to the user x track pairs that we were asked to predict
+  mX_hat <- melt(X_hat, varnames = c("User", "Track"), value.name = "Rating")
+  newdata$train <- newdata$train[, setdiff(colnames(newdata$train), "Rating"), with = F]
+  mX_hat <- merge_intersect_X(newdata$train, mX_hat)
+  mX_hat$Rating
 }
