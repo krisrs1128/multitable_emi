@@ -5,7 +5,8 @@
 
 merge_preprocess_opts <- function(opts = list()) {
   default_opts <- list()
-  default_opts$impute_median <- TRUE
+  default_opts$impute_median <- FALSE
+  scale_max <- FALSE
   modifyList(default_opts, opts)
 }
 
@@ -13,6 +14,9 @@ merge_preprocess_opts <- function(opts = list()) {
 #' @export
 preprocess_data <- function(X, opts = list()) {
   opts <- merge_preprocess_opts(opts)
+  if(opts$scale_max) {
+    apply(X, 2, function(x) x / max(x, na.rm = TRUE))
+  }
   if(opts$impute_median) {
     na_cols <- apply(X, 2, function(x) any(is.na(x)))
     X[, na_cols] <- apply(X[, na_cols, drop = F], 2, function(x) {
