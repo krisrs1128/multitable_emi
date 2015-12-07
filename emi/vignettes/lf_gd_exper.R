@@ -18,12 +18,8 @@ data(users)
 train <- train[1:10000, ]
 
 # convert to matrix with rownames
-X <- dcast(train, User ~ Track, value.var = "Rating", fill = NA)
-X2 <- as.matrix(X[, -1, with = F])
-colnames(X2) <- colnames(X)[-1]
-rownames(X2) <- unlist(X[, 1, with = F])
-X <- X2
-rm(X2)
+colnames(train)
+X3 <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
 
 # construct feature matrix describing user x track combinations
 mwords <- words %>%
@@ -31,6 +27,8 @@ mwords <- words %>%
   melt(id.vars = c("Artist", "User")) %>%
   arrange(User, variable)
 Z_pairs <- acast(mwords, User ~ Artist ~ variable)
+
+head(words)
 
 # construct feature matrix describing the users
 Z_users <- users %>%
