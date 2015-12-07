@@ -1,0 +1,593 @@
+\documentclass{article}\usepackage{graphicx, color}
+\usepackage{eulervm}
+%% maxwidth is the original width if it is less than linewidth
+%% otherwise use linewidth (to make sure the graphics do not exceed the margin)
+\makeatletter
+\def\maxwidth{ %
+  \ifdim\Gin@nat@width>\linewidth
+    \linewidth
+  \else
+    \Gin@nat@width
+  \fi
+}
+\makeatother
+
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\definecolor{fgcolor}{rgb}{0.2, 0.2, 0.2}
+\newcommand{\hlnumber}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hlfunctioncall}[1]{\textcolor[rgb]{0.501960784313725,0,0.329411764705882}{\textbf{#1}}}%
+\newcommand{\hlstring}[1]{\textcolor[rgb]{0.6,0.6,1}{#1}}%
+\newcommand{\hlkeyword}[1]{\textcolor[rgb]{0,0,0}{\textbf{#1}}}%
+\newcommand{\hlargument}[1]{\textcolor[rgb]{0.690196078431373,0.250980392156863,0.0196078431372549}{#1}}%
+\newcommand{\hlcomment}[1]{\textcolor[rgb]{0.180392156862745,0.6,0.341176470588235}{#1}}%
+\newcommand{\hlroxygencomment}[1]{\textcolor[rgb]{0.43921568627451,0.47843137254902,0.701960784313725}{#1}}%
+\newcommand{\hlformalargs}[1]{\textcolor[rgb]{0.690196078431373,0.250980392156863,0.0196078431372549}{#1}}%
+\newcommand{\hleqformalargs}[1]{\textcolor[rgb]{0.690196078431373,0.250980392156863,0.0196078431372549}{#1}}%
+\newcommand{\hlassignement}[1]{\textcolor[rgb]{0,0,0}{\textbf{#1}}}%
+\newcommand{\hlpackage}[1]{\textcolor[rgb]{0.588235294117647,0.709803921568627,0.145098039215686}{#1}}%
+\newcommand{\hlslot}[1]{\textit{#1}}%
+\newcommand{\hlsymbol}[1]{\textcolor[rgb]{0,0,0}{#1}}%
+\newcommand{\hlprompt}[1]{\textcolor[rgb]{0.2,0.2,0.2}{#1}}%
+
+\definecolor{shadecolor}{rgb}{.97, .97, .97}
+\definecolor{messagecolor}{rgb}{0, 0, 0}
+\definecolor{warningcolor}{rgb}{1, 0, 1}
+\definecolor{errorcolor}{rgb}{1, 0, 0}
+
+\usepackage{alltt}
+% ------------------------------------------------------------------------
+% Packages
+% ------------------------------------------------------------------------
+\usepackage{amsmath,amssymb,amsfonts,graphicx,mathtools,setspace}
+\usepackage[body={7in, 9in},left=1in,right=1in]{geometry}
+\usepackage{url}
+\usepackage[colorlinks]{hyperref}
+
+% ------------------------------------------------------------------------
+% Macros
+% ------------------------------------------------------------------------
+%~~~~~~~~~~~~~~~
+% List shorthand
+%~~~~~~~~~~~~~~~
+\newcommand{\BIT}{\begin{itemize}}
+\newcommand{\EIT}{\end{itemize}}
+\newcommand{\BNUM}{\begin{enumerate}}
+\newcommand{\ENUM}{\end{enumerate}}
+%~~~~~~~~~~~~~~~
+% Text with quads around it
+%~~~~~~~~~~~~~~~
+\newcommand{\qtext}[1]{\quad\text{#1}\quad}
+%~~~~~~~~~~~~~~~
+% Shorthand for math formatting
+%~~~~~~~~~~~~~~~
+\newcommand\mbb[1]{\mathbb{#1}}
+\newcommand\mbf[1]{\mathbf{#1}}
+\def\mc#1{\mathcal{#1}}
+\def\mrm#1{\mathrm{#1}}
+%~~~~~~~~~~~~~~~
+% Common sets
+%~~~~~~~~~~~~~~~
+\def\reals{\mathbb{R}} % Real number symbol
+\def\integers{\mathbb{Z}} % Integer symbol
+\def\rationals{\mathbb{Q}} % Rational numbers
+\def\naturals{\mathbb{N}} % Natural numbers
+\def\complex{\mathbb{C}} % Complex numbers
+%~~~~~~~~~~~~~~~
+% Common functions
+%~~~~~~~~~~~~~~~
+\renewcommand{\exp}[1]{\operatorname{exp}\left(#1\right)} % Exponential
+\def\indic#1{\mbb{I}\left({#1}\right)} % Indicator function
+\providecommand{\argmax}{\mathop\mathrm{arg max}} % Defining math symbols
+\providecommand{\argmin}{\mathop\mathrm{arg min}}
+\providecommand{\arccos}{\mathop\mathrm{arccos}}
+\providecommand{\dom}{\mathop\mathrm{dom}} % Domain
+\providecommand{\range}{\mathop\mathrm{range}} % Range
+\providecommand{\diag}{\mathop\mathrm{diag}}
+\providecommand{\tr}{\mathop\mathrm{tr}}
+\providecommand{\abs}{\mathop\mathrm{abs}}
+\providecommand{\card}{\mathop\mathrm{card}}
+\providecommand{\sign}{\mathop\mathrm{sign}}
+\def\rank#1{\mathrm{rank}({#1})}
+\def\supp#1{\mathrm{supp}({#1})}
+%~~~~~~~~~~~~~~~
+% Common probability symbols
+%~~~~~~~~~~~~~~~
+\def\E{\mathbb{E}} % Expectation symbol
+\def\Earg#1{\E\left[{#1}\right]}
+\def\Esubarg#1#2{\E_{#1}\left[{#2}\right]}
+\def\P{\mathbb{P}} % Probability symbol
+\def\Parg#1{\P\left({#1}\right)}
+\def\Psubarg#1#2{\P_{#1}\left[{#2}\right]}
+\def\Cov{\mrm{Cov}} % Covariance symbol
+\def\Covarg#1{\Cov\left[{#1}\right]}
+\def\Covsubarg#1#2{\Cov_{#1}\left[{#2}\right]}
+\def\Var{\mrm{Var}}
+\def\Vararg#1{\Var\left(#1\right)}
+\def\Varsubarg#1#2{\Var_{#1}\left(#2\right)}
+\newcommand{\family}{\mathcal{P}} % probability family
+\newcommand{\eps}{\epsilon}
+\def\absarg#1{\left|#1\right|}
+\def\msarg#1{\left(#1\right)^{2}}
+\def\logarg#1{\log\left(#1\right)}
+%~~~~~~~~~~~~~~~
+% Distributions
+%~~~~~~~~~~~~~~~
+\def\Gsn{\mathcal{N}}
+\def\Ber{\textnormal{Ber}}
+\def\Bin{\textnormal{Bin}}
+\def\Unif{\textnormal{Unif}}
+\def\Mult{\textnormal{Mult}}
+\def\NegMult{\textnormal{NegMult}}
+\def\Dir{\textnormal{Dir}}
+\def\Bet{\textnormal{Beta}}
+\def\Poi{\textnormal{Poi}}
+\def\HypGeo{\textnormal{HypGeo}}
+\def\GEM{\textnormal{GEM}}
+\def\BP{\textnormal{BP}}
+\def\DP{\textnormal{DP}}
+\def\BeP{\textnormal{BeP}}
+%~~~~~~~~~~~~~~~
+% Theorem-like environments
+%~~~~~~~~~~~~~~~
+\newtheorem{definition}{Definition}
+\newtheorem{example}{Example}
+\newtheorem{theorem}{Theorem}
+
+%-----------------------
+% Probability sets
+%-----------------------
+\newcommand{\X}{\mathcal{X}}
+\newcommand{\Y}{\mathcal{Y}}
+%-----------------------
+% vector notation
+%-----------------------
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bt}{\mathbf{t}}
+\newcommand{\xbar}{\overline{x}}
+\newcommand{\Xbar}{\overline{X}}
+\newcommand{\tolaw}{\xrightarrow{\mathcal{L}}}
+\newcommand{\toprob}{\xrightarrow{\mathbb{P}}}
+\newcommand{\laweq}{\overset{\mathcal{L}}{=}}
+\newcommand{\F}{\mathcal{F}}
+%-----------------------
+% Math environments
+%-----------------------
+%\newcommand{\ba}{\begin{align}}
+%\newcommand{\ea}{\end{align}}
+%\newcommand{\ba}{\begin{align}}
+
+<<echo = FALSE>>=
+library("knitr")
+library("ggplot2")
+opts_chunk$set(cache = TRUE, fig.width = 10, fig.height = 5, fig.align = "center",
+               echo = FALSE)
+theme_set(theme_bw())
+read_chunk("emi_multitable_case_study.R")
+@
+
+<<libraries, message = F>>=
+@
+
+<<load-data>>=
+@
+
+\linespread{1.5}
+
+\title{A Case Study in Multitable Data Analysis: The Data Science
+  London EMI Hackathon}
+\author{Kris Sankaran}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+The Data Science London EMI Hackathon was a one day hackathon
+sponsored by Data Science London and Kaggle. The general question is
+to predict whether a music listener will enjoy a particular track,
+given their previously expressed preferences and those of their
+peers. From this view, it was a standard netflix-style matrix
+completion problem, and indeed, the winning entries formulated the
+problem in this way.
+
+However, some wrinkles are introduced by the inclusion of supplemental
+data sets for creating these predictions. It is exactly this
+additional information that makes the problem interesting from a
+multitable point of view. Indeed, this data presents the opportunity
+for synthesizing matrix-completion and multitable data analysis methods.
+
+As usual, the experiments described in this report are vignettes in
+an \texttt{R} package, available publicly
+\href{https://github.com/krisrs1128/multitable_emi/tree/master/emi}{here}.
+
+\section{Available Data}
+
+There are four data sets of interest, which we call \texttt{train},
+\texttt{test}, \texttt{users}, and \texttt{words}. \texttt{train} and
+\texttt{test} seem to be from the exact same matrix, but with entries
+randomly dropped for testing. If they were the only data sets
+available, this problem would be exactly a matrix completion
+problem. We summarize the data sets in the list below. The data
+dimensions are given in Table \ref{tab:data_dims}.
+
+\begin{itemize}
+\item \texttt{train}: Each row specifies a ``Track - User'' pair. The
+  response of interest, which we need to predict in \texttt{test}, is
+  a ratings column, taking values between 0 and 100. In addition, for
+  each track, we have an ID for   the artist who wrote it. Last, since
+  this data was collected over several sessions, during which the
+  population of people surveyed could vary substantially, there is a
+  ``Time'' column specifying during which survey session the data was
+  collected. Plots of the number of times the different artists,
+  tracks, users, and survey sessions appeared in the training and test
+  data are in Figures \ref{fig:artist_hist},
+  \ref{fig:track_hist}, and \ref{fig:user_counts}. The ratings
+  histogram is multimodal, see Figure \ref{fig:rating_hist}.
+\item \texttt{test}: This data has the same form as \texttt{train},
+  but ommiting the ratings column.
+\item \texttt{users}: This is a survey data set taken on many, though
+  not all, users in the training / test data set. It is split into
+  different themes -- one part asks general demographic information
+  (in what region of Britain are they from, what kind of employment do
+  they have, what is their age) and another asks general questions
+  about the role of music in the users life. This is the only data set
+  that doesn't include any information about the artists. An example
+  of the kinds of responses available is plotted in Figure
+  \ref{fig:user-pair}. Two general takeaways from this data set are
+  that the actual scores are multimodal, as in the raw ratings in
+  \texttt{train}, and many questions are very redundant.
+\item \texttt{words}: This data set gives richer information for some
+  of the user-track pairs in \texttt{train} and \texttt{test}, as well
+  as pairs that never appear in either of those data sets. Given a
+  track, the user is asked to label 0-1 for whether certain words
+  describe the track (``Way out'', ``Cool'', ``Catchy'', ...).  There
+  are a few other binary questions, like whether the user likes the
+  artist or owns any music by that artist. One important property of
+  this data set is that, during each session, only a subset of about
+  two-thirds of questions are asked. So, there is a lot of
+  missingness, but only 16 missingness patterns per sample (there are
+  17 survey sessions, the overlap is perfect except for two sessions
+  with the same question pattern).
+\end{itemize}
+
+<<data-dims, results = "asis">>=
+@
+
+\begin{figure}
+<<ratings-hist>>=
+@
+\caption{The histogram of ratings across all user-artist pairs in the
+  training data. Raters tend to give round-number scores.}
+\label{fig:rating_hist}
+\end{figure}
+
+\begin{figure}
+<<artist-counts>>=
+@
+\caption{Different artists appeared different numbers of time in the
+  survey results. Further, most artists were only included in one of
+  the survey sessions.}
+\label{fig:artist_hist}
+\end{figure}
+
+\begin{figure}
+<<track-counts>>=
+@
+\caption{Here are different tracks according to the number of times
+  they appear in the training and tests sets, and shaded by which
+  survey session they appeared in. Most tracks were played in only one
+  session.}
+\label{fig:track_hist}
+\end{figure}
+
+\begin{figure}
+<<user-counts>>=
+@
+\caption{This is the number of times each user appears in the test
+  vs. training sets. Most users appear a few times in each data set,
+  though there are some who are never in one or the other.}
+\label{fig:user_counts}
+\end{figure}
+
+\begin{figure}
+<<user-pair-example>>=
+@
+\caption{An example pair of questions in the user data, with densities
+  for the numbers of users who gave that score overlaid.}
+\label{fig:user-pair}
+\end{figure}
+
+\section{Analysis}
+
+We have considered a few strategies for prediction. In this section,
+we review a baseline based on featurizing user-artist pairs, but not
+sharing information across similar users. We then review the basic
+matrix completion problem and an extension designed to allow inclusion
+of external information, which was the basis of the winning solutions
+in the actual hackathon.
+
+\subsection{Featurization}
+
+Our baseline model doesn't explicitly apply any matrix completion
+ideas. The idea is, for each user-artist pair, create a feature vector
+consisting of,
+\begin{itemize}
+  \item If available, the current user's response to the survey.
+  \item If the current user-track pair appeared in the training data,
+    include the binary words indicator vector for that pair.
+  \item Include indicators for the current artist and track, based on
+    the data in \texttt{train}.
+\end{itemize}
+
+This matrix has many NA values, since there will inevitably be
+user-track pairs that we didn't observe in the training data. To deal
+with this, we use SVD imputation, which exploits multivariate
+information across the tables. The procedure is as follows,
+\begin{itemize}
+  \item Impute all missing values with the means for their columns.
+  \item Compute a rank-$k$ approximation of the mean-imputed matrix by
+    the SVD. Replace missing values with the approximation's values at
+    that index.
+  \item Compute a rank-$k$ approximation to the result of the first
+    iteration, and substitute the new approximation values at the
+    missing-indices. Iterate this to convergence.
+\end{itemize}
+
+
+Section \label{sec:svd_imputation}. After performing the imputation,
+train a simple elastic-net model on half of \texttt{train}, using the
+\texttt{caret} package. The remaining half is left for
+validation\footnote{There is an actual CV framework being developed in
+  the \texttt{R} package}.
+
+<<baseline-model>>=
+@
+
+The errors on the training and validation sets are shown in Figures
+\ref{fig:elnet_train_rmse} and \ref{fig:elnet_test_rmse},
+respectively. The RMSEs on the training and validation sets are
+\Sexpr{round(train_rmse, 5)} and \Sexpr{round(test_rmse, 5)}. The best
+performance during the hackathon was 13.19638, the Tracks-mean
+benchmark gives 21.22536.
+
+This is a naive solution, which doesn't exploit the matrix completion
+structure of the true problem. Nonetheless, it is a useful benchmark to
+have available when evaluating performance of alternative (supposedly
+more sophisticated models).
+\begin{figure}
+<<elnet-preds-plot>>=
+@
+\caption{To assess the performance of the baseline model, we can look
+  at the predicted vs. true values on the training and test sets.}
+\label{fig:elnet_rmse}
+\end{figure}
+
+\subsection{Matrix Completion}
+
+We now describe the canonical matrix completion problem, and how it
+applies to this data set. Most of the discussion in this section is
+based on notes from Andrea Montanari's course on ``Inference,
+Estimation, and Information Processing'' and
+\cite{keshavan2010matrix}.
+
+Let $X \in \reals^{n \times p}$ be a matrix of users vs. tracks. We
+imagine that, in the $ij^{th}$ cell, there is a rating for how much
+user $i$ would enjoy track $j$. Now, since most users have listened to
+at most a very small fraction of tracks, in reality we have access to
+only a small subset of entries in $X$, which we denote as $X^{E}$. $E$
+will denote the indices of observed entries.
+
+Our first approach is to use the SVD, since we imagine $X$ is a
+low-rank matrix -- many users have similar tastes, and many tracks
+sound alike. Formally, we apply the following procedure.
+
+\begin{itemize}
+  \item Estimate mean ratings for each user, among the observed
+    entries, $\hat{b}_{i} \in \reals^{n}$.
+  \item If $X_{ij}^{E}$ is observed, replace it with $X_{ij}^{E} -
+    \hat{b}_{i}$. If it is not observed, keep the entry equal to
+    0. Call this centered version $\tilde{X}^{E}$.
+  \item Compute the SVD of $\tilde{X}^{E}$, and let
+    $P\left(\tilde{X}^{E}\right) = \sum_{k = 1}^{r}
+    u_{k}d_{k}v^{T}_{k}$ be the rank-$r$ approximation.
+  \item Make predictions based on $\hat{X} = b_{i}1_{p}^{T} +
+    \frac{np}{\absarg{E}}P\left(\tilde{X}^{E}\right)$. The scaling
+    factor $\frac{np}{\absarg{E}}$ accounts for the fact that entries
+    of $X^{E}$ are smaller than those in $X$ on average, since so
+    many of them are just zero.
+\end{itemize}
+
+$\tilde{X}^{E}$ is large, but also sparse, so computation of the SVD
+is typically not too difficult.
+
+A second approach is to optimize the following criterion,
+\begin{align*}
+\text{minimize}_{P \in \reals^{n \times r}, Q \in \reals^{p \times r}}
+&F\left(P, Q\right) := \sum_{\left(i, j\right) \in E} \left(\tilde{x}_{ij}^{E} -
+  p_{i}^{T}q_{j}\right)^{2} + \lambda_{1}\sum_{i= 1}^{n}
+\|p_{i}\|_{2}^{2} + \lambda_{2} \sum_{j = 1}^{p} \|q_{j}\|_{2}^{2}.
+\end{align*}
+The problem no longer has a closed form solution, because we are
+summing only over observed entries. The standard approach is to
+perform gradient descent. The derivatives with respect to the $p_{i}$
+and $q_{i}$ are simple,
+\begin{align}
+\frac{\partial F\left(P, Q\right)}{\partial p_{i}} &= \lambda_{1} p_{i} -
+\sum_{j \in E\left(i, \cdot\right)} \left(\tilde{x}_{ij}^{E} -
+  p_{i}^{T}q_{j}\right)q_{j} \\
+\frac{\partial F\left(P, Q\right)}{\partial q_{j}} &= \lambda_{2} q_{j} -
+\sum_{i \in E\left(\cdot, j\right)} \left(\tilde{x}_{ij}^{E} -
+  p_{i}^{T}q_{j}\right)p_{i}.
+\end{align}
+Note that the sums can be interpreted as weighted averages. For
+example, the first is a weighted average of movie scores, with weights
+given by how much user $i$ liked movie $j$.
+
+At each step of the gradient descent, we simply update
+\begin{align}
+p_{i}^{t + 1} &= p_{i}^{t} - \gamma \frac{\partial F\left(P,
+    Q\right)}{\partial p_{i}} \\
+q_{j}^{t + 1} &= q_{j}^{t} - \gamma \frac{\partial F\left(P,
+    Q\right)}{\partial q_{j}}.
+\end{align}
+
+for all $i$ and $j$. A common alternative -- especially in cases like
+the EMI data set, where there are many samples -- is to apply
+stochastic gradient descent. Here, only one element of the summand in
+the gradient is evaluated a time. There is no longer a guarantee that
+every step decreases the objective, but the computational savings of
+this approach can allow for many more iterations.
+
+\subsection{Matrix Completion with Regressors}
+
+With this formulation, it is natural to extend matrix completion to
+multiple tables. An extension that led to the best performance during
+the hackathon was based on the optimization \cite{shandaemi},
+\begin{align}
+\text{minimize}_{P \in \reals^{n \times r}, Q \in \reals^{p \times r},
+  \beta \in \reals^{p}} &\sum_{\left(i, j\right) \in E}
+\left(x_{ij}^{E} - p_{i}^{T}q_{j} - \beta^{T} z_{ij}\right)^{2} + \sum_{i =
+  1}^{n} \lambda_{1} \|p_{i}\|_{2}^{2} + \sum_{j = 1}^{p}
+\lambda_{2}\|q_{j}\|_{2}^{2} + \lambda_{3}\|\beta\|_{2}^{2},
+\end{align}
+where $z_{ij}$ is a vector containing both the user survey results and
+user-track words information the \texttt{words} and \texttt{users}
+data sets. Again, this model can be learned using gradient /
+stochastic gradient descent.
+
+\section{Appendix}
+
+\subsection{Exponential Family PCA}
+
+Here, we review exponential family PCA as formulated in
+\cite{collins2001generalization}. In the multitable context, the
+appeal of this method is that it can return PCA-like scores in the
+presence of mixed data types. Indeed, by viewing the minimization
+criteria as negative log-likelihoods, standard MFA and PCA can be seen
+as implicitly assuming Gaussian structure on the data. Exponential
+Family PCA is explicit about the probabilistic structure of the
+different feature sets.
+
+In a way this model is just doing dimension reduction on the natural
+parameters. However, the criterion involving the reduced natural
+parameters involves some interesting choices. First, recall that if
+$x_{i}$ is drawn from an exponential family, its density has the form
+\begin{align}
+  p_{\theta}\left(x_{i}\right) &= h\left(x\right)\exp{x^{T}\theta
+    - \psi\left(\theta\right)}.
+\end{align}
+
+It is claimed that
+\begin{align}
+  \sum_{i = 1}^{n} -\log p_{\theta}\left(x_{i}\vert\right) &= \sum_{i
+    = 1}^{n} B_{\psi^{\ast}}\left(x_{i} \| \nabla
+    \psi\left(\theta\right)\right),
+\end{align}
+
+up to constants in $\theta$. Here $B_{\psi^{\ast}}\left(\cdot \|
+  \cdot \right)$ is the Bregman divergence induced by the dual
+$\psi^{\ast}$ of the log-partition function $\psi$. Recall that the
+Bregman divergence $B_{F}\left(x \| y\right)$ is defined as the
+distance, evaluated at $y$, between a function $F$ and the line
+tangent to $F$ at $x$: $B_{F}\left(x \| y\right) = F\left(y\right) -
+F\left(x\right) - f\left(x\right)\left(y - x\right)$.
+
+In the exponential family, $\Esubarg{\theta}{x_{i}} =
+\nabla \psi\left(\theta\right)$, so we see that maximizing the likelihood
+of $\theta$ is like trying to minimize the distance between $x_{i}$
+and its expectation, with respect to the Bregman divergence.
+
+To check the connection claimed above, we use the definition of the
+Bregman divergence,
+\begin{align}
+  B_{\psi^{\ast}}\left(x \| \nabla \psi\left(\theta\right)\right) &=
+  \psi^{\ast}\left(x\right) - \psi^{\ast}\left(\nabla
+    \psi\left(\theta\right)\right) - \nabla \psi^{\ast}\left(\nabla
+    \psi\left(\theta\right)\right)\left(x -
+    \nabla\psi\left(\theta\right)\right) \\
+  &= \psi^{\ast}\left(x\right) -
+  \theta^{T}\nabla\psi\left(\theta\right) + \psi\left(\theta\right) -
+  \theta^{T}\left(x - \nabla\psi\left(\theta\right)\right) \\
+  &= \psi^{\ast}\left(x\right) - x^{T}\theta + \psi\left(\theta\right),
+\end{align}
+
+where we evaluated the dual at $\nabla \psi\left(\theta\right)$,
+\begin{align}
+\sup_{z} z^{T}\nabla\psi\left(\theta\right) - \psi\left(z\right),
+\end{align}
+by differentiating with respect to $z$ and finding $z =
+\left(\nabla\psi\right)^{-1}\left(\nabla\psi\left(\theta\right)\right)
+= \theta$, and recalled that the gradient of the dual is the value
+that attains the sup, which we just found was $z = \theta$.
+
+At this point, it is immediate that
+\begin{align}
+  -\log p\left(x_{i} \vert \theta\right) &= -\log h\left(x_{i}\right)
+  - \psi^{\ast}\left(x_{i}\right) + B_{\psi^{\ast}}\left(x_{i} \|
+    \nabla \psi\left(\theta\right)\right),
+\end{align}
+and the only term involving $\theta$ is the Bregman divergence, as desired.
+
+With this set up, the rest is easy. The authors suppose $\theta_{i} =
+Wz_{i}$. The parameters $W$ and $z_{i}$ are chosen by alternately
+minimizing $\sum_{i = 1}^{n} B_{\psi^{\ast}}\left(x_{i} \| \nabla
+  \psi\left(Wz_{i}\right)\right)$ over $W$ and $\left(z_{i}\right)_{i
+  = 1}^{n}$.
+
+Next we present a small experiment using simulated Bernoulli data. A
+biclustering of a binary table is shown in Figure
+\ref{fig:bern_heatmap}, and shows a few clear types of underlying
+binary vectors. We applied exponential family PCA and recovered the
+scores in Figure \ref{fig:exp_pca_res}.
+
+However, we could also apply PCA (Figure \ref{fig:normal-pca}) or MDS
+with the Jaccard distance (Figure \ref{fig:normal-cmdscale}). So, I'm
+not entirely convinced of the utility of this method yet -- the real
+test will be applying alternative methods to mixed data.
+
+\begin{figure}
+<<simulate-bern-data>>=
+@
+\caption{A co-clustering of the simualted bernoulli data shows four clear classes.}
+\label{fig:bern_heatmap}
+\end{figure}
+
+<<pca>>=
+@
+
+\begin{figure}
+<<exp-pca-res>>=
+@
+\caption{The scores recovered by exponential family PCA on the
+  simulated data.}
+\label{fig:bern_heatmap}
+\end{figure}
+
+\begin{figure}
+<<pca-eigenvectors>>=
+@
+\caption{The subspace recovered by exponential family PCA on the
+  simulated data.}
+\label{fig:bern_heatmap}
+\end{figure}
+
+\begin{figure}
+<<normal-pca>>=
+@
+\caption{The result of applying ordinary PCA to the simulated data.}
+\label{fig:normal-pca}
+\end{figure}
+
+\begin{figure}
+<<normal-cmdscale>>=
+@
+\caption{The result of applying multidimensional scaling using the
+  Jaccard distance between rows.}
+\label{fig:normal-cmdscale}
+\end{figure}
+
+\bibliographystyle{unsrt}
+\bibliography{emi_multitable_case_study}
+
+\end{document}
