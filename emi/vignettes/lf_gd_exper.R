@@ -4,71 +4,48 @@
 ################################################################################
 
 ## ---- libraries ----
-library("abind")
-library("reshape2")
 library("data.table")
+library("emi")
+library("imputation")
 library("plyr")
 library("dplyr")
-library("emi")
 
 ## ---- evaluate ----
 data(train)
 data(words)
 data(users)
-train <- train[1:10000, ]
 
-# convert to matrix with rownames
-colnames(train)
-X3 <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
+# working on subset of data
+train <- train[1:5000, ]
+words <- words %>% filter(User %in% train$User)
+users <- users %>% filter(User %in% train$User)
 
-# construct feature matrix describing user x track combinations
-mwords <- words %>%
-  filter(User %in% train$User) %>%
-  melt(id.vars = c("Artist", "User")) %>%
-  arrange(User, variable)
-Z_pairs <- acast(mwords, User ~ Artist ~ variable)
+# need to do imputation on words, because covariates optimization assumes full Z
+# matrix is available
+words_num <- as.matrix(words[, -c(1:2), with = F])
+words_hat <- SVDImpute(words_num, k = 5, num.iters = 20)
+words <- data.table(words[, 1:2, with = F], words_hat$x)
 
-head(words)
+data_list <- list(train = train[1:4500, ],
+                  words = words,
+                  users = users)
+newdata <- list(train = train[4501:5000, ],
+                words = words,
+                users = users)
 
-# construct feature matrix describing the users
-Z_users <- users %>%
-  filter(User %in% train$User) %>%
-  melt(id.vars = "User") %>%
-  acast(User ~ variable)
+trained_model <- svd_cov_train(data_list, list(n_iter = 20))
+preds <- svd_cov_predict(trained_model, newdata)
+plot(newdata$train$Rating, preds, asp = 1)
 
-# will repeat this matrix for every artist
-Z_users_array <- array(rep(Z_users, length = dim(Z_pairs)[2]), dim = c(dim(Z_users)[1], dim(Z_pairs)[2], dim(Z_users)[2]))
-dimnames(Z_users_array) <- list(rownames(Z_users), colnames(Z_pairs), colnames(Z_users))
+# we can disect the pieces of this prediction
+pred_data <- prepare_pred_data(trained_model$data_list, newdata)
+dim(pred_data$X)
+dim(pred_data$Z)
 
-ix_user <- match(rownames(X), rownames(Z_users_array))
-ix_pairs <- match(rownames(X), rownames(Z_pairs))
-Z <- abind(Z_users_array[ix_user,, ], Z_pairs[ix_pairs,, ], along = 3)
+impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, trained_model$opts)
+plot(impute_res$res$obj)
+plot(impute_res$res$P)
+plot(impute_res$res$beta)
 
-# now we need to associate each of these artists with one of the tracks in the
-# original ratings matrix
-artist_tracks <- train[, c("Artist", "Track"), with = F] %>%
-  distinct() %>%
-  arrange(Track)
-ix_track <- match(colnames(X), artist_tracks$Track)
-matched_artists <- artist_tracks[ix_track, "Artist", with = F] %>%
-  unlist(use.names = F) %>%
-  as.character()
-Z <- Z[, matched_artists, ]
-
-# lazy person's imputation
-Z[is.na(Z)] <- 0
-
-#grad_results <- lf_gd_cov(X, Z, k_factors = 2, lambdas = c(10, 10, 100),
-#                          n_iter = 100, batch_p = 1, gamma_pq = 1e-4,
-#                          gamma_beta = 1e-8)
-
-grad_results <- lf_gd_cov(X, Z, k_factors = 2, lambdas = c(10, 10, 100),
-                          n_iter = 10, batch_factors = 1, batch_samples = .01,
-                          gamma_pq = 1e-4, gamma_beta = 1e-8)
-
-
-plot(log(grad_results$objs))
-plot(grad_results$P)
-plot(grad_results$Q)
-plot(grad_results$beta)
-
+data.frame(newdata$train$Rating,
+           y_hat = postprocess_preds(impute_res$X_hat, newdata))
