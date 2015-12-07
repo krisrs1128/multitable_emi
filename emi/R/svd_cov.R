@@ -33,6 +33,9 @@ NULL
 #' By default, the cast version of mZ is returned without any reordering of
 #' users.
 #' @return An array Z with the structure described above.
+#' @importFrom magrittr %>%
+#' @importFrom data.table melt
+#' @importFrom reshape2 acast
 #' @param mZ
 #' @export
 cast_covariates <- function(mZ, x_names = NULL) {
@@ -123,11 +126,12 @@ expand_by_track <- function(Z, track_names, artist_track_map) {
 #' @return A covariates matrix with dimensions user x track x question. If no
 #' response was recorded, the array element is filled with an NA.
 #' @importFrom data.table setcolorder
+#' @importFrom magrittr %>%
 #' @export
 prepare_covariates <- function(users, words, x_names, track_names,
                                artist_track_map) {
   mZ_words <- words %>%
-    setcolorder(c(2, 1, 3:ncol(mZ_words)))
+    setcolorder(c(2, 1, 3:ncol(words)))
   cast_covariates(mZ_words, x_names) %>%
     merge_users_covariates(users) %>%
     expand_by_track(track_names, artist_track_map)
@@ -191,6 +195,28 @@ svd_cov_train <- function(data_list, opts = list()) {
   list(data_list = data_list, opts = opts)
 }
 
+#' @title Perform SVD with Covariates imputation
+#' @param X A users x tracks matrix of ratings.
+#' @param Z A users x tracks x question covariates matrix.
+#' @param opts A list of options to use in prediction.
+#' @return A list with the following elements: \cr
+#'  $X_hat A users x tracks matrix of predicted ratings. \cr
+#'  $res The full output of the SVD imputation with covariates, svd_cov, in the
+#'   src directory. /\cr
+#' @export
+svd_cov_impute <- function(X, Z, opts) {
+  # call underlying C++ routine
+  res <- svd_cov(X, Z, opts$k_factors, opts$lambdas, opts$n_iter,
+                 opts$batch_samples, opts$batch_factors, opts$gamma_pq,
+                 opts$gamma_beta)
+
+  # get the X_hat matrix
+  Zbeta <- apply(Z, 2, function(x) x %*% res$beta)
+  X_hat <- res$P %*% t(res$Q) + Zbeta
+  dimnames(X_hat) <- dimnames(X)
+  list(X_hat = X_hat, res = res)
+}
+
 #' @title Matrix completion predictions using the SVD
 #' @param trained_model The output of svd_train()
 #' @param newdata A new data_list of the same form as data_list in the input to
@@ -220,17 +246,10 @@ svd_cov_predict <- function(trained_model, newdata) {
   X <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
   Z <- prepare_covariates(users, words, rownames(X), colnames(X),
                           artist_track_map)
-  res <- svd_cov(X, Z, opts$k_factors, opts$lambdas, opts$n_iter,
-                 opts$batch_samples, opts$batch_factors, opts$gamma_pq,
-                 opts$gamma_beta)
-
-  # get the X_hat matrix
-  Zbeta <- apply(Z, 2, function(x) x %*% res$beta)
-  X_hat <- res$P %*% t(res$Q) + Zbeta
-  dimnames(X_hat) <- dimnames(X)
+  impute_res <- svd_cov_impute(X, Z, opts)
 
   # filter down to the user x track pairs that we were asked to predict
-  mX_hat <- melt(X_hat, varnames = c("User", "Track"), value.name = "Rating")
+  mX_hat <- melt(impute_res$X_hat, varnames = c("User", "Track"), value.name = "Rating")
   newdata$train <- newdata$train[, setdiff(colnames(newdata$train), "Rating"), with = F]
   mX_hat <- merge_intersect_X(newdata$train, mX_hat)
   mX_hat$Rating
