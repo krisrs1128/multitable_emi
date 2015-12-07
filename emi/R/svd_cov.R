@@ -8,6 +8,10 @@ intersect_names <- function(X, Y) {
   intersect(colnames(X), colnames(Y))
 }
 
+merge_intersect <- function(X, Y) {
+  merge(X, Y, by = intersect_names(X, Y), all = TRUE)
+}
+
 merge_intersect_X <- function(X, Y) {
   merge(X, Y, by = intersect_names(X, Y), all.x = TRUE)
 }
@@ -222,6 +226,8 @@ svd_cov_impute <- function(X, Z, opts) {
 #' @param newdata A new data_list of the same form as data_list in the input to
 #' svd_cov_train() [except it doesn't need to have a "Rating" column"]
 #' @return y_hat Predictions y_hat for every new user-track pair in the newdata.
+#' @importFrom plyr aaply
+#' @importFrom data.table melt
 #' @examples
 #' data(train)
 #' data(users)
@@ -237,20 +243,29 @@ svd_cov_predict <- function(trained_model, newdata) {
 
   # merge training with new data (with ratings as NAs)
   newdata$train$Rating <- NA
-  train <- merge_intersect_X(train_list$train, newdata$train)
-  users <- merge_intersect_X(train_list$users, newdata$users)
-  words <- merge_intersect_X(train_list$words, newdata$words)
+  train <- merge_intersect(train_list$train, newdata$train)
+  users <- merge_intersect(train_list$users, newdata$users)
+  words <- merge_intersect(train_list$words, newdata$words)
 
-  # train the model
+  # prepare the data
   artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
   X <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
   Z <- prepare_covariates(users, words, rownames(X), colnames(X),
                           artist_track_map)
+
+  # preprocess Z, to remove NAs [which aren't allowed in the optimization]
+  process_opts <- list(impute_median = TRUE, scale_max = TRUE)
+  Z <- aaply(Z, 2, function(z) preprocess_data(z, process_opts))
+  Z <- aperm(Z, c(2, 1, 3))
+
+  # train the model
   impute_res <- svd_cov_impute(X, Z, opts)
 
   # filter down to the user x track pairs that we were asked to predict
   mX_hat <- melt(impute_res$X_hat, varnames = c("User", "Track"), value.name = "Rating")
   newdata$train <- newdata$train[, setdiff(colnames(newdata$train), "Rating"), with = F]
+  newdata$train$User <- as.integer(as.character(newdata$train$User))
+  newdata$train$Track <- as.integer(as.character(newdata$train$Track))
   mX_hat <- merge_intersect_X(newdata$train, mX_hat)
   mX_hat$Rating
 }
