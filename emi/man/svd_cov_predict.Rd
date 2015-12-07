@@ -10,12 +10,21 @@ svd_cov_predict(trained_model, newdata)
 \item{trained_model}{The output of svd_train()}
 
 \item{newdata}{A new data_list of the same form as data_list in the input to
-svd_train()}
+svd_cov_train() [except it doesn't need to have a "Rating" column"]}
 }
 \value{
 y_hat Predictions y_hat for every new user-track pair in the newdata.
 }
 \description{
 Matrix completion predictions using the SVD
+}
+\examples{
+data(train)
+data(users)
+data(words)
+data_list <- list(train = train[1:100, ], words = words, users = users)
+newdata <- list(train = train[101:200, -5, with = F], words = words, users = users)
+trained_model <- svd_cov_train(data_list, list(n_iter = 5))
+svd_cov_predict(trained_model, newdata) # all na's, because we need to do imputation on Z
 }
 

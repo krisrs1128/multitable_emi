@@ -11,11 +11,6 @@ merge_users_covariates(Z, users)
 
 \item{users}{A matrix whose first column is a user id, and whose remaining
 columns give descriptions of musical preference.}
-
-\item{We}{would like to include users' descriptions of their personal tastes
-in this regression problem. However, our regression array has the form
-user x artist x question, so to merge it in, we need to copy the same
-responses for every artist.}
 }
 \value{
 Z_users The matrix Z with the questions dimension increased to
@@ -24,6 +19,9 @@ did not appear in the users matrix, the new question is filled in with all
 NAs.
 }
 \description{
-Merge in user specific covariates
+We would like to include users' descriptions of their personal tastes
+in this regression problem. However, our regression array has the form
+user x artist x question, so to merge it in, we need to copy the same
+responses for every artist.
 }
 

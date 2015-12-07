@@ -6,6 +6,22 @@
 
 using namespace Rcpp;
 
+// lf_sgd
+List lf_sgd(NumericMatrix R, IntegerMatrix obs_ix, NumericVector lambdas, double eta, int iter_max, int d);
+RcppExport SEXP emi_lf_sgd(SEXP RSEXP, SEXP obs_ixSEXP, SEXP lambdasSEXP, SEXP etaSEXP, SEXP iter_maxSEXP, SEXP dSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject __result;
+    Rcpp::RNGScope __rngScope;
+    Rcpp::traits::input_parameter< NumericMatrix >::type R(RSEXP);
+    Rcpp::traits::input_parameter< IntegerMatrix >::type obs_ix(obs_ixSEXP);
+    Rcpp::traits::input_parameter< NumericVector >::type lambdas(lambdasSEXP);
+    Rcpp::traits::input_parameter< double >::type eta(etaSEXP);
+    Rcpp::traits::input_parameter< int >::type iter_max(iter_maxSEXP);
+    Rcpp::traits::input_parameter< int >::type d(dSEXP);
+    __result = Rcpp::wrap(lf_sgd(R, obs_ix, lambdas, eta, iter_max, d));
+    return __result;
+END_RCPP
+}
 // get_batch_ix
 arma::uvec get_batch_ix(int n, double p);
 RcppExport SEXP emi_get_batch_ix(SEXP nSEXP, SEXP pSEXP) {
@@ -36,9 +52,9 @@ BEGIN_RCPP
     return __result;
 END_RCPP
 }
-// lf_gd_cov
-Rcpp::List lf_gd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec, int k_factors, Rcpp::NumericVector lambdas, int n_iter, double batch_samples, double batch_factors, double gamma_pq, double gamma_beta);
-RcppExport SEXP emi_lf_gd_cov(SEXP XSEXP, SEXP Z_vecSEXP, SEXP k_factorsSEXP, SEXP lambdasSEXP, SEXP n_iterSEXP, SEXP batch_samplesSEXP, SEXP batch_factorsSEXP, SEXP gamma_pqSEXP, SEXP gamma_betaSEXP) {
+// svd_cov
+Rcpp::List svd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec, int k_factors, Rcpp::NumericVector lambdas, int n_iter, double batch_samples, double batch_factors, double gamma_pq, double gamma_beta);
+RcppExport SEXP emi_svd_cov(SEXP XSEXP, SEXP Z_vecSEXP, SEXP k_factorsSEXP, SEXP lambdasSEXP, SEXP n_iterSEXP, SEXP batch_samplesSEXP, SEXP batch_factorsSEXP, SEXP gamma_pqSEXP, SEXP gamma_betaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject __result;
     Rcpp::RNGScope __rngScope;
@@ -51,23 +67,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type batch_factors(batch_factorsSEXP);
     Rcpp::traits::input_parameter< double >::type gamma_pq(gamma_pqSEXP);
     Rcpp::traits::input_parameter< double >::type gamma_beta(gamma_betaSEXP);
-    __result = Rcpp::wrap(lf_gd_cov(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta));
-    return __result;
-END_RCPP
-}
-// lf_sgd
-List lf_sgd(NumericMatrix R, IntegerMatrix obs_ix, NumericVector lambdas, double eta, int iter_max, int d);
-RcppExport SEXP emi_lf_sgd(SEXP RSEXP, SEXP obs_ixSEXP, SEXP lambdasSEXP, SEXP etaSEXP, SEXP iter_maxSEXP, SEXP dSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject __result;
-    Rcpp::RNGScope __rngScope;
-    Rcpp::traits::input_parameter< NumericMatrix >::type R(RSEXP);
-    Rcpp::traits::input_parameter< IntegerMatrix >::type obs_ix(obs_ixSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type lambdas(lambdasSEXP);
-    Rcpp::traits::input_parameter< double >::type eta(etaSEXP);
-    Rcpp::traits::input_parameter< int >::type iter_max(iter_maxSEXP);
-    Rcpp::traits::input_parameter< int >::type d(dSEXP);
-    __result = Rcpp::wrap(lf_sgd(R, obs_ix, lambdas, eta, iter_max, d));
+    __result = Rcpp::wrap(svd_cov(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta));
     return __result;
 END_RCPP
 }

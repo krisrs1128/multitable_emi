@@ -8,7 +8,19 @@ merge_svd_cov_opts(opts = list())
 }
 \arguments{
 \item{opts}{A partially specified list of options to use when performing the
-SVD imputation. The currently supported options are}
+SVD imputation. The currently supported options are
+ $batch_samples: The proportion of samples to use when evaluating gradients
+  for each user's / track's latent factors. Defaults to 1, so it is usual
+  gradient rather than stochastic gradient descent.
+ $batch_factors: The proportion of factors to update during each iteration.
+  Defaults to 1, so it is usual  gradient rather than stochastic gradient
+  descent.
+ $gamma_pq: The learning rate for the users and tracks factors.
+ $gamma_beta: The learning rate for the regression covariates.
+ $k_factors: How many latent factors should we use for the users and tracks?
+ $lambdas: Regularization parameters for user factors, track factors, and
+  covariates regression coefficients, respectively.
+ $n_iter: Number of iterations to run the (stochastic) gradient descent)}
 }
 \description{
 Default options for SVD with covariates
