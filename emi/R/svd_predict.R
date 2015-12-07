@@ -104,21 +104,13 @@ svd_impute <- function(R, k, alpha, min_val, max_val) {
 svd_predict <- function(trained_model, newdata) {
   # merge train and test, and reshape data to wide
   opts <- trained_model$opts
-  mR_test <- as.data.table(newdata$train[, opts$keep_cols, with = F], Rating = 0)
+  mR_test <- data.table(newdata$train[, opts$keep_cols, with = F], Rating = 0)
   mR <- rbind(trained_model$mR, mR_test)
   R <- cast_ratings(mR)
 
   # get imputation results
   R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
-  test_users <- unique(newdata$train[[opts$keep_cols[1]]])
-  mR_hat <- melt.data.table(as.data.table(R_hat[test_users, ], keep.rownames = TRUE))
-  setnames(mR_hat, c(opts$keep_cols, "Rating"))
 
   # filter down to the predictions on the test cases
-  y_hat <- merge(newdata$train, mR_hat, by = opts$keep_cols,
-                 all.x = TRUE, all.y = FALSE, sort = F) %>%
-                   select_("Rating") %>%
-                   unlist(use.names = FALSE)
-  y_hat[is.na(y_hat)] <- mean(trained_model$mR$Rating, na.rm = T)
-  y_hat
+  postprocess_preds(R_hat, newdata)
 }
