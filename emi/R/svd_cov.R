@@ -160,7 +160,6 @@ prepare_pred_data <- function(train_list, newdata) {
   words <- merge_intersect(train_list$words, newdata$words)
 
   # prepare the data
-  message("Preparing ratings and covariates for imputation.")
   artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
   X <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
   Z <- prepare_covariates(users, words, rownames(X), colnames(X),
@@ -185,7 +184,7 @@ prepare_pred_data <- function(train_list, newdata) {
 #' @importFrom data.table melt
 #' @export
 postprocess_preds <- function(X_hat, newdata) {
-  mX_hat <- melt(impute_res$X_hat, varnames = c("User", "Track"), value.name = "Rating")
+  mX_hat <- melt(X_hat, varnames = c("User", "Track"), value.name = "Rating")
   newdata$train <- newdata$train[, setdiff(colnames(newdata$train), "Rating"), with = F]
   newdata$train$User <- as.integer(as.character(newdata$train$User))
   newdata$train$Track <- as.integer(as.character(newdata$train$Track))
@@ -290,17 +289,12 @@ svd_cov_impute <- function(X, Z, opts) {
 #' svd_cov_predict(trained_model, newdata) # all na's, because we need to do imputation on Z
 #' @export
 svd_cov_predict <- function(trained_model, newdata) {
-  opts <- trained_model$opts
-  train_list <- trained_model$data_list
+  message("Preparing data for imputation.")
+  pred_data <- prepare_pred_data(trained_model$data_list, newdata)
 
-  pred_data <- prepare_pred_data(trained_model, newdata)
-
-  # train the model
   message("Training model.")
-  impute_res <- svd_cov_impute(X, Z, opts)
+  impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, trained_model$opts)
 
-  # filter down to the user x track pairs that we were asked to predict
   message("Extracting predictions from imputed matrix.")
   postprocess_preds(impute_res$X_hat, newdata)
 }
-
