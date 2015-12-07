@@ -89,30 +89,20 @@ ggplot(users) +
   ggtitle("Example pair of questions in users data set")
 
 ## ---- baseline-model ----
-X <- merge(users, words, by = "User", all = T)
-X <- merge(train, X, by = c("User", "Artist"), all.x = T)
-train_ix <- sample(seq_len(nrow(X)), .5 * nrow(X))
-x_num <- as.matrix(X[, 6:ncol(X), with = F])
-x_num <- scale(x_num, center = F, scale = apply(x_num, 2, max, na.rm = T))
-x_hat <- SVDImpute(x_num, 10, verbose = F)
-x_hat <- x_hat$x
-x_fac <- expand_factors(X[, c("Track", "Time"), with = F])
-x <- cbind(x_fac, x_hat)
-y <- X$Rating
-glmnet_model <- train(x = x[train_ix, ], y = y[train_ix], method = "glmnet", trControl = trainControl(verbose = F))
-glmnet_model
-glmnet_pred_df <- rbind(data.table(type = "train", y = y[train_ix], y_hat = predict(glmnet_model)),
-      data.table(type = "test", y = y[-train_ix], y_hat = predict(glmnet_model, newdata = x[-train_ix, ])))
-train_rmse <- RMSE(filter(glmnet_pred_df, type == "train")[, 3, with = F], filter(glmnet_pred_df, type == "train")[, 2, with = F])
-test_rmse <- RMSE(filter(glmnet_pred_df, type == "test")[, 3, with = F], filter(glmnet_pred_df, type == "test")[, 2, with = F])
+data_list <- list(train = train[1:10000, ], users = users, words = words)
+caret_opts <- list(train_control = trainControl(number = 10, verbose = TRUE))
+glmnet_res <- evaluate(data_list, caret_train, caret_opts, caret_predict)
 
 ## ---- elnet-preds-plot ----
-ggplot(glmnet_pred_df) +
-  geom_point(aes(x = y, y = y_hat), alpha = 0.01) +
+ggplot(glmnet_res$pred_pairs[[1]]) +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red") +
   coord_fixed() +
-  facet_wrap(~type) +
-  ggtitle("Test and Train Errors for Benchmark Model")
+  ggtitle("Test Errors for Benchmark Model")
+
+## ---- svd-model ----
+
+## ---- svd-with-cov ----
 
 ## ---- simulate-bern-data ----
 n <- 1000
