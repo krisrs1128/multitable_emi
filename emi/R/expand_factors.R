@@ -11,6 +11,7 @@
 #' and all factor columns expanded into dummy variables at the back.
 #' @importFrom caret class2ind
 #' @importFrom data.table as.data.table
+#' @importFrom magrittr %>%
 #' @export
 expand_factors <- function(Z) {
   Z <- as.data.table(Z)
@@ -23,13 +24,12 @@ expand_factors <- function(Z) {
   for(i in seq_along(factor_ix)) {
     cur_name <- names(factor_ix)[i]
     cur_factor <- unlist(Z[, factor_ix[i], with = F])
-    levels(cur_factor) <- c(levels(cur_factor), "NA")
-    cur_factor[is.na(cur_factor)] <- "NA"
+    if(any(is.na(cur_factor))) {
+      cur_factor <- addNA(cur_factor)
+    }
     new_mat <- class2ind(cur_factor)
     colnames(new_mat) <- paste(cur_name, colnames(new_mat), sep = ".")
     Z_expand <- cbind(Z_expand, new_mat)
   }
   return (Z_expand)
 }
-
-
