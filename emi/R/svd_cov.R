@@ -4,14 +4,20 @@
 ################################################################################
 
 # utils ------------------------------------------------------------------------
+#' @title Get shared column names
+#' @export
 intersect_names <- function(X, Y) {
   intersect(colnames(X), colnames(Y))
 }
 
+#' @title Wrapper for merging by all shared columns
+#' @export
 merge_intersect <- function(X, Y) {
   merge(X, Y, by = intersect_names(X, Y), all = TRUE)
 }
 
+#' @title Wrapper for merging by all shared columns, but only keeping X
+#' @export
 merge_intersect_X <- function(X, Y) {
   merge(X, Y, by = intersect_names(X, Y), all.x = TRUE)
 }
@@ -166,7 +172,7 @@ prepare_pred_data <- function(train_list, newdata) {
                           artist_track_map)
 
   # preprocess Z, to remove NAs [which aren't allowed in the optimization]
-  process_opts <- list(impute_median = TRUE, scale_max = TRUE)
+  process_opts <- list(impute_svd = TRUE, scale_range = TRUE)
   Z <- aaply(Z, 2, function(z) preprocess_data(z, process_opts))
   Z <- aperm(Z, c(2, 1, 3))
   list(X = X, Z = Z)
