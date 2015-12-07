@@ -64,9 +64,9 @@ evaluate <- function(data_list, train_fun, train_opts, pred_fun,
       # train and evaluate model
       cur_model <- train_fun(train_data_list, train_opts)
       cur_preds <- pred_fun(cur_model, test_data_list)
-      truth <- unlist(train[-train_ix, "Rating", with = F])
+      truth <- unlist(test_data_list$train[, "Rating", with = F])
       errs[cur_k, cur_rep] <- RMSE(cur_preds, truth)
-      pred_pairs[[cur_k, cur_rep]] <- list(y = truth, y_hat = cur_preds)
+      pred_pairs[[cur_k, cur_rep]] <- data.frame(y = truth, y_hat = cur_preds)
     }
   }
   return (list(mean_rmse = mean(errs), errs = errs, pred_pairs = pred_pairs))

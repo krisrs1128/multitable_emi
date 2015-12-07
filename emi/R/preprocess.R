@@ -54,8 +54,14 @@ scale_range <- function(X) {
       return (x)
     }
   }
-  numeric_cols <- sapply(X, function(x) class(x) == "numeric")
-  X[, which(numeric_cols)] <- numcolwise(scale_fun)(X)
+  numeric_cols <- apply(X, 2, function(x) class(x) == "numeric")
+  for(j in which(numeric_cols)) {
+    if(class(X) == "data.table") {
+      X[, j] <- scale_fun(X[, j, with = F])
+    } else {
+      X[, j] <- scale_fun(X[, j, drop = F])
+    }
+  }
   X
 }
 

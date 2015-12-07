@@ -83,6 +83,6 @@ caret_train <- function(data_list, opts = list()) {
 #' @return y_hat for the new data.
 #' @export
 caret_predict <- function(trained_model, newdata) {
-  new_train_data <- prepare_features(newdata, trained_model$opts$process_opts)
+  newdata <- prepare_features(newdata, trained_model$opts$process_opts)
   predict(trained_model$model, newdata = new_train_data$X)
 }

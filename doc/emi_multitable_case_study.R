@@ -90,19 +90,72 @@ ggplot(users) +
 
 ## ---- baseline-model ----
 data_list <- list(train = train[1:10000, ], users = users, words = words)
-caret_opts <- list(train_control = trainControl(number = 10, verbose = TRUE))
+caret_opts <- list(train_control = trainControl(number = 5, verbose = TRUE))
 glmnet_res <- evaluate(data_list, caret_train, caret_opts, caret_predict)
 
 ## ---- elnet-preds-plot ----
-ggplot(glmnet_res$pred_pairs[[1]]) +
+trained_model <- caret_train(data_list, caret_opts)
+y_hat <- caret_predict(trained_model, data_list)
+training_errs <- data.frame(y = data_list$train$Rating, y_hat = y_hat)
+RMSE(training_errs[, 1], training_errs[, 2])
+
+ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red") +
   coord_fixed() +
-  ggtitle("Test Errors for Benchmark Model")
+  ggtitle("Training Errors for Benchmark Model")
+
+ggplot((glmnet_res$pred_pairs[[1]])) +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
+  geom_abline(b = 1, a = 0, col = "red") +
+  coord_fixed() +
+  ggtitle("Test Errors for Benchmark Model [held out fold 1]")
 
 ## ---- svd-model ----
 
+
 ## ---- svd-with-cov ----
+words_small <- words %>% filter(User %in% train$User[1:1000])
+users_small <- users %>% filter(User %in% train$User[1:1000])
+
+# need to do imputation on words, because covariates optimization assumes full Z
+# matrix is available
+words_num <- as.matrix(words_small[, -c(1:2), with = F])
+words_hat <- SVDImpute(words_num, k = 5, num.iters = 20, verbose = FALSE)
+words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
+
+data_list <- list(train = train[1:900, ],
+                  words = words_small,
+                  users = users_small)
+newdata <- list(train = train[901:1000, ],
+                  words = words_small,
+                  users = users_small)
+
+svd_cov_model <- svd_cov_train(data_list, list(n_iter = 100))
+preds <- svd_cov_predict(svd_cov_model, newdata)
+
+# we can dissect the pieces of this prediction
+pred_data <- prepare_pred_data(data_list, data_list)
+dim(pred_data$X)
+dim(pred_data$Z)
+
+impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, trained_model$opts)
+plot(impute_res$res$obj)
+plot(impute_res$res$P)
+plot(impute_res$res$beta)
+
+data.frame(newdata$train$Rating,
+           y_hat = postprocess_preds(impute_res$X_hat, newdata))
+
+# we can also cross-validate, though if we aren't even able to overfit to the
+# training data, there isn't really much of a point.
+svd_cov_results <- evaluate(list(train = train, words = words, users = users),
+                            svd_cov_train, list(n_iter = 10), svd_cov_predict)
+
+ggplot(svd_cov_results$pred_pairs[[1]]) +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
+  geom_abline(aes(slope = 1, intercept = 0), col = "red") +
+  coord_fixed()
 
 ## ---- simulate-bern-data ----
 n <- 1000

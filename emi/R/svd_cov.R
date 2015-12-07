@@ -13,13 +13,13 @@ intersect_names <- function(X, Y) {
 #' @title Wrapper for merging by all shared columns
 #' @export
 merge_intersect <- function(X, Y) {
-  merge(X, Y, by = intersect_names(X, Y), all = TRUE)
+  merge(X, Y, by = intersect_names(X, Y), all = TRUE, sort = FALSE)
 }
 
 #' @title Wrapper for merging by all shared columns, but only keeping X
 #' @export
 merge_intersect_X <- function(X, Y) {
-  merge(X, Y, by = intersect_names(X, Y), all.x = TRUE)
+  merge(X, Y, by = intersect_names(X, Y), all.x = TRUE, sort = FALSE)
 }
 
 # compilation ------------------------------------------------------------------
@@ -157,6 +157,7 @@ prepare_covariates <- function(users, words, x_names, track_names,
 #' @return A list with the following elements, \cr
 #'  $X: A user x track rating matrix
 #'  $Z: A user x track x question covariates matrix
+#' @importFrom imputation SVDImput
 #' @export
 prepare_pred_data <- function(train_list, newdata) {
   # merge training with new data (with ratings as NAs)
@@ -172,8 +173,9 @@ prepare_pred_data <- function(train_list, newdata) {
                           artist_track_map)
 
   # preprocess Z, to remove NAs [which aren't allowed in the optimization]
-  process_opts <- list(impute_svd = TRUE, scale_range = TRUE)
-  Z <- aaply(Z, 2, function(z) preprocess_data(z, process_opts))
+  Z <- aaply(Z, 2, function(z) {
+    SVDImpute(z, k = 5, num.iters = 5, verbose = F)$x %>% scale_range()
+  })
   Z <- aperm(Z, c(2, 1, 3))
   list(X = X, Z = Z)
 }
