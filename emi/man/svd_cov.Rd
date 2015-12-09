@@ -5,7 +5,7 @@
 \title{Regular gradient descent for latent factor model with covariates}
 \usage{
 svd_cov(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors,
-  gamma_pq, gamma_beta)
+  gamma_pq, gamma_beta, verbose)
 }
 \arguments{
 \item{X}{The ratings matrix. Unobserved entries must be marked NA. Users
@@ -23,6 +23,8 @@ gradient for each factor in the gradient descent.}
 \item{batch_factors}{The proportion of latent factors to update at each
 iteration.}
 
+\item{verbose}{Print the objective at each iteration of the descent?}
+
 \item{Z}{The covariates associated with each pair. This must be shaped as an
 array with users along rows, tracks along columns, and features along
 slices.}
@@ -32,7 +34,7 @@ slices.}
 \value{
 A list with the following elements, \cr
   $P The learned user latent factors. \cr
-  $Q The learned track latent factors.
+  $Q The learned track latent factors. \cr
   $beta The learned regression coefficients.
 }
 \description{

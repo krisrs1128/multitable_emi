@@ -60,12 +60,13 @@ update_factor <- function(x, z, p_i, Q, beta, lambda, batch_samples, gamma) {
 #' @param batch_factors The proportion of latent factors to update at each
 #' iteration.
 #' @param gamma The step-size in the gradient descent.
+#' @param verbose Print the objective at each iteration of the descent?
 #' @return A list with the following elements, \cr
 #'   $P The learned user latent factors. \cr
-#'   $Q The learned track latent factors.
+#'   $Q The learned track latent factors. \cr
 #'   $beta The learned regression coefficients.
 #' @export
-svd_cov <- function(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta) {
-    .Call('emi_svd_cov', PACKAGE = 'emi', X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta)
+svd_cov <- function(X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta, verbose) {
+    .Call('emi_svd_cov', PACKAGE = 'emi', X, Z_vec, k_factors, lambdas, n_iter, batch_samples, batch_factors, gamma_pq, gamma_beta, verbose)
 }
 

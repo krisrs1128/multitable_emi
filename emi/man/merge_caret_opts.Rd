@@ -12,6 +12,8 @@ The currently supported options are
   $process_opts: A list of processing options to pass the feature matrix
    through, via the preprocess_data() function.
   $method: The method to use from caret. See https://topepo.github.io/caret/modelList.html
+  $postprocess_fun: A function used to postprocess the predictions at test
+   time.
   $train_control: The trControl argument to caret::train().}
 }
 \value{
