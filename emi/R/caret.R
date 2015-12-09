@@ -43,7 +43,7 @@ prepare_features <- function(data_list, process_opts) {
 
   # impute NAs, and scale to range (when using default process_opts)
   X <- X %>%
-    preprocess_data(opts$process_opts) %>%
+    preprocess_data(process_opts) %>%
     expand_factors %>%
     as.matrix()
   list(X = X, y = y)
@@ -84,5 +84,5 @@ caret_train <- function(data_list, opts = list()) {
 #' @export
 caret_predict <- function(trained_model, newdata) {
   newdata <- prepare_features(newdata, trained_model$opts$process_opts)
-  predict(trained_model$model, newdata = new_train_data$X)
+  predict(trained_model$model, newdata = newdata$X)
 }
