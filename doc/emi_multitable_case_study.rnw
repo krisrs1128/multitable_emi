@@ -334,12 +334,13 @@ information across the tables. The procedure is as follows,
     missing-indices. Iterate this to convergence.
 \end{itemize}
 
+\subsection{Baseline Regression}
+\label{sec:baseline}
 
-Section \label{sec:svd_imputation}. After performing the imputation,
-train a simple elastic-net model on half of \texttt{train}, using the
-\texttt{caret} package. The remaining half is left for
-validation\footnote{There is an actual CV framework being developed in
-  the \texttt{R} package}.
+After performing the imputation, we train a simple elastic-net model
+on half of \texttt{train}, using the \texttt{caret} package. The
+remaining half is left for validation\footnote{There is an actual CV
+  framework being developed in the \texttt{R} package}.
 
 <<baseline-model>>=
 @
@@ -535,8 +536,78 @@ data in figure \ref{fig:svd_held_out}.}
 \subsubsection{Matrix Completion with Regressors}
 
 Next, we apply the approach that minimizes the
-objective \label{eq:mat_compl_regress}. I use SVD imputation on the
-words matrix to remove NAs.
+objective \label{eq:mat_compl_regress}. I am still focusing on the
+10,000 users with the most ratings, so the problem is quite a bit
+easier than the original problem studied in section
+\ref{sec:baseline}.
+
+The two preprocessing steps we apply are
+\begin{itemize}
+  \item SVD Imputation on \texttt{words} and \texttt{words}: We impute
+    missing values using the same approach as section
+    \ref{sec:baseline}. One subtlety is that we have to compute this
+    on the array $Z$; we accomplish this by imputing one slice at a time.
+  \item Scaling: We scale all the $Z$ covariates to the range
+    $\left[0, 1\right]$, so that they are comparable from the view of
+    the objective function.
+\end{itemize}
+
+We run a full cross-validation below. The optimization is slow, but
+exploiting both regression and matrix completion structure seems to
+have led to a gain, though again these results are not directly
+comparable to the baseline regressions from earlier (and that approach
+might do better on this simpler data set). Also, we could speed up the
+optimization using stochastic gradient descent, but the improvement
+seemed marginal in preliminary experiments, and so we are sticking to
+standard gradient descent here.
+
+<<svd-with-cov>>=
+@
+
+\begin{figure}
+<<svd-with-cov-scatter>>=
+@
+\caption{Predictions vs. truth on the first held out fold from the
+  cross-validation of the SVD with covariates routine.}
+\label{fig:svd-cov-scatter}
+\end{figure}
+
+The cross-validation routine above doesn't actually save the model
+results from each iteration, and to get a sense of the estimated
+parameters, we re-estimate the model on the full data.
+
+Below, we display a subview of the ratings matrix and covariates array
+that are fed into the optimization.
+<<svd-with-cov-data>>=
+@
+
+\begin{figure}
+<<svd-with-cov-objective>>=
+@
+\caption{Objective function from the gradient descent of the SVD with
+  covariates algorithm.}
+\label{fig:svd-cov-objective}
+\end{figure}
+
+\begin{figure}
+<<svd-with-cov-scores>>=
+@
+\caption{Scores from the SVD with covariates (the $p_{i}$'s in the
+  earlier development). These can be shaded by covariates $Z$, though
+  this kind of exploratory analysis is not the usual goal of the
+  prediction routine we are considering.}
+\label{fig:svd-cov-scores}
+\end{figure}
+
+\begin{figure}
+<<svd-with-cov-beta>>=
+@
+\caption{Coefficients $\beta$ associated with different
+  covariates. The coefficients at the tails seem interesting, but the
+  others outside the tails are probably just noise, since the
+  optimization with initialize with gaussian $beta$.}
+\label{fig:svd-cov-scores}
+\end{figure}
 
 \section{Appendix}
 

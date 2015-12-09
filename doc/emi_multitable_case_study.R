@@ -143,9 +143,7 @@ train$n <- NULL
 
 words_small <- words %>% filter(User %in% train$User[1:10000])
 users_small <- users %>% filter(User %in% train$User[1:10000])
-data_list <- list(train = train[1:10000, ],
-                             words = words_small,
-                             users = users_small)
+data_list <- list(train = train[1:10000, ], words = words_small, users = users_small)
 
 svd_results <- evaluate(data_list, svd_train, list(k = 5), svd_predict)
 svd_results
@@ -191,39 +189,42 @@ words_num <- as.matrix(words_small[, -c(1:2), with = F])
 words_hat <- SVDImpute(words_num, k = 5, num.iters = 20, verbose = FALSE)
 words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
 
-svd_cov_model <- svd_cov_train(data_list, list(n_iter = 4, lambdas = c(.01, .01, 1),
-                                               gamma_pq = 0.01, verbose = T))
-preds <- svd_cov_predict(svd_cov_model, newdata)
-
-# we can dissect the pieces of this prediction
-pred_data <- prepare_pred_data(data_list, newdata)
-dim(pred_data$X)
-dim(pred_data$Z)
-
 opts <- merge_svd_cov_opts(list(lambdas = c(0.0001, 0.0001, .01),
                                 gamma_pq = 0.001, gamma_beta = 1e-5,
                                 n_iter = 20, verbose = T))
-impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
-plot(impute_res$res$obj)
-plot(impute_res$res$P)
-ggplot(data.frame(x = dimnames(pred_data$Z)[[3]], y = impute_res$res$beta)) +
-  geom_point(aes(x = reorder(x, y, mean), y = y)) +
-  theme(axis.text.x = element_text(angle = -90, size = 4))
-
-data.frame(newdata$train$Rating,
-           y_hat = postprocess_preds(impute_res$X_hat, newdata))
-
-# we can also cross-validate, though if we aren't even able to overfit to the
-# training data, there isn't really much of a point.
-svd_cov_results <- evaluate(list(train = train[1:1000, ],
-                                 words = words_small,
-                                 users = users_small),
-                            svd_cov_train, list(n_iter = 10), svd_cov_predict)
+svd_cov_results <- evaluate(data_list, svd_cov_train, opts, svd_cov_predict)
 svd_cov_results
+
+## ---- svd-with-cov-scatter ----
 ggplot(svd_cov_results$pred_pairs[[1]]) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(aes(slope = 1, intercept = 0), col = "red") +
-  coord_fixed()
+  coord_fixed() +
+  ggtitle("Predictions from SVD with Covariates [Fold 1]")
+
+## ---- svd-with-cov-data ----
+# we can dissect the pieces of this prediction
+pred_data <- prepare_pred_data(data_list, newdata)
+pred_data$X[1:10, 1:10]
+pred_data$Z[1:3, 1:3, 1:3]
+impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
+
+## ---- svd-with-cov-obj ----
+obj <- impute_res$res$obj
+ggplot(data.frame(iter = seq_along(obj), obj = obj)) +
+  geom_line(aes(x = iter, y = obj)) +
+  ggtitle("Objective across Gradient Descent Iterations")
+
+## ---- svd-with-cov-scores ----
+ggplot(data.frame(P = impute_res$res$P, Z = pred_data$Z[,1,])) +
+  geom_point(aes(x = P.1, y = P.2, col = Z.AGE)) +
+  ggtitle("User Scores after SVD with Covariates")
+
+## ---- svd-with-cov-beta ----
+ggplot(data.frame(x = dimnames(pred_data$Z)[[3]], y = impute_res$res$beta)) +
+  geom_point(aes(x = reorder(x, y, mean), y = y)) +
+  theme(axis.text.x = element_text(angle = -90, size = 4)) +
+  ggtitle("Coefficients from SVD with Covariates")
 
 ## ---- simulate-bern-data ----
 n <- 1000
