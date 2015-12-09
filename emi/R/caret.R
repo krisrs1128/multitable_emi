@@ -9,6 +9,8 @@
 #'   $process_opts: A list of processing options to pass the feature matrix
 #'    through, via the preprocess_data() function.
 #'   $method: The method to use from caret. See https://topepo.github.io/caret/modelList.html
+#'   $postprocess_fun: A function used to postprocess the predictions at test
+#'    time.
 #'   $train_control: The trControl argument to caret::train().
 #' @return The original opts list with defaults filled in.
 #' @export
@@ -17,6 +19,7 @@ merge_caret_opts <- function(opts = list()) {
   default_opts$method <- "glmnet"
   default_opts$process_opts <- list(add_na_level = TRUE, impute_svd = TRUE, scale_range = TRUE)
   default_opts$train_control <- trainControl(verbose = TRUE)
+  default_opts$postprocess_fun <- function(y) y # don't shrink
   modifyList(default_opts, opts)
 }
 
@@ -84,5 +87,6 @@ caret_train <- function(data_list, opts = list()) {
 #' @export
 caret_predict <- function(trained_model, newdata) {
   newdata <- prepare_features(newdata, trained_model$opts$process_opts)
-  predict(trained_model$model, newdata = newdata$X)
+  y_hat <- predict(trained_model$model, newdata = newdata$X)
+  trained_model$opts$postprocess_fun(y_hat)
 }
