@@ -157,7 +157,7 @@ prepare_covariates <- function(users, words, x_names, track_names,
 #' @return A list with the following elements, \cr
 #'  $X: A user x track rating matrix
 #'  $Z: A user x track x question covariates matrix
-#' @importFrom imputation SVDImput
+#' @importFrom imputation SVDImpute
 #' @export
 prepare_pred_data <- function(train_list, newdata) {
   # merge training with new data (with ratings as NAs)
