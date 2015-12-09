@@ -83,7 +83,7 @@ svd_impute <- function(R, k, alpha, min_val, max_val) {
 
   # perform svd approximation
   R[is.na(R)] <- 0
-  svdR <- irlba(as(R, "sparseMatrix"), nu = 5, nv = 5)
+  svdR <- irlba(as(R, "sparseMatrix"), nu = k, nv = k)
   pR <- alpha * svdR$u %*% diag(svdR$d) %*% t(svdR$v)
   pR_hat <- pR + user_means_mat
 
@@ -109,7 +109,7 @@ svd_predict <- function(trained_model, newdata) {
   R <- cast_ratings(mR)
 
   # get imputation results
-  R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
+  R_hat <- do.call(svd_impute, c(list(R = R), opts))
 
   # filter down to the predictions on the test cases
   postprocess_preds(R_hat, newdata)
