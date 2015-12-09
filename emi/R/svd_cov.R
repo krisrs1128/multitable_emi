@@ -190,9 +190,12 @@ prepare_pred_data <- function(train_list, newdata) {
 #' @return A vector of ratings corresponding to the user x track pairs in $train
 #' from the newdata.
 #' @importFrom data.table melt
+#' @importFrom magrittr %>%
+#' @importFrom data.table setnames
 #' @export
 postprocess_preds <- function(X_hat, newdata) {
-  mX_hat <- melt(X_hat, varnames = c("User", "Track"), value.name = "Rating")
+  mX_hat <- melt(X_hat) %>%
+    setnames(c("User", "Track", "Rating"))
   newdata$train <- newdata$train[, setdiff(colnames(newdata$train), "Rating"), with = F]
   newdata$train$User <- as.integer(as.character(newdata$train$User))
   newdata$train$Track <- as.integer(as.character(newdata$train$Track))
@@ -226,6 +229,7 @@ merge_svd_cov_opts <- function(opts = list()) {
   default_opts$k_factors <- 5
   default_opts$lambdas <- c(10, 10, 10)
   default_opts$n_iter <- 5
+  default_opts$verbose <- FALSE
   modifyList(default_opts, opts)
 }
 #' @title Wrapper for saving information in SVD with covariates model
@@ -268,14 +272,16 @@ svd_cov_train <- function(data_list, opts = list()) {
 #'   src directory. /\cr
 #' @export
 svd_cov_impute <- function(X, Z, opts) {
-  # call underlying C++ routine
-  res <- svd_cov(X, Z, opts$k_factors, opts$lambdas, opts$n_iter,
-                 opts$batch_samples, opts$batch_factors, opts$gamma_pq,
-                 opts$gamma_beta)
+  # call underlying C++ routine, after row centering
+  X_means <- rowMeans(X, na.rm = TRUE)
+  X_means[is.na(X_means)] <- mean(X, na.rm = T) # some users never appear in training
+  X0 <- sweep(X, 1, X_means, "-")
+  res <- do.call(svd_cov, c(list(X = X0, Z = Z), opts))
 
-  # get the X_hat matrix
+  # get the X_hat matrix, and add back user means
   Zbeta <- apply(Z, 2, function(x) x %*% res$beta)
   X_hat <- res$P %*% t(res$Q) + Zbeta
+  X_hat <- sweep(X_hat, 1, X_means, "+")
   dimnames(X_hat) <- dimnames(X)
   list(X_hat = X_hat, res = res)
 }
