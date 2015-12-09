@@ -133,16 +133,17 @@ double objective_fun(arma::mat X, arma::cube Z, arma::mat P, arma::mat Q, arma::
 //' @param batch_factors The proportion of latent factors to update at each
 //' iteration.
 //' @param gamma The step-size in the gradient descent.
+//' @param verbose Print the objective at each iteration of the descent?
 //' @return A list with the following elements, \cr
 //'   $P The learned user latent factors. \cr
-//'   $Q The learned track latent factors.
+//'   $Q The learned track latent factors. \cr
 //'   $beta The learned regression coefficients.
 //' @export
 // [[Rcpp::export]]
 Rcpp::List svd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
-		     int k_factors, Rcpp::NumericVector lambdas, int n_iter,
-		     double batch_samples, double batch_factors,
-		     double gamma_pq, double gamma_beta) {
+		   int k_factors, Rcpp::NumericVector lambdas, int n_iter,
+		   double batch_samples, double batch_factors,
+		   double gamma_pq, double gamma_beta, bool verbose) {
 
   // convert to arma
   Rcpp::IntegerVector Z_dim = Z_vec.attr("dim");
@@ -160,8 +161,6 @@ Rcpp::List svd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
 
   // perform gradient descent steps
   for(int cur_iter = 0; cur_iter < n_iter; cur_iter++) {
-    printf("iteration %d \n", cur_iter);
-
     // update user factors
     arma::uvec cur_factors = get_batch_ix(m, batch_factors);
     for(int i = 0; i < cur_factors.n_elem; i++) {
@@ -185,7 +184,10 @@ Rcpp::List svd_cov(Rcpp::NumericMatrix X, Rcpp::NumericVector Z_vec,
     // update regression coefficients
     beta = update_beta(Rcpp::as<arma::mat>(X), Z, P, Q, beta, lambdas[2], gamma_beta);
     objs[cur_iter] = objective_fun(Rcpp::as<arma::mat>(X), Z, P, Q, beta, lambdas);
-    printf("Objective: %g \n", objs[cur_iter]);
+    if(verbose) {
+      printf("iteration %d \n", cur_iter);
+      printf("Objective: %g \n", objs[cur_iter]);
+    }
   }
 
   return Rcpp::List::create(Rcpp::Named("P") = P,
