@@ -90,7 +90,8 @@ ggplot(users) +
 
 ## ---- baseline-model ----
 data_list <- list(train = train[1:10000, ], users = users, words = words)
-caret_opts <- list(train_control = trainControl(number = 5, verbose = TRUE))
+caret_opts <- list(train_control = trainControl(number = 5, verbose = TRUE),
+                   method = "glmnet")
 glmnet_res <- evaluate(data_list, caret_train, caret_opts, caret_predict)
 
 ## ---- elnet-preds-plot ----
@@ -111,47 +112,114 @@ ggplot((glmnet_res$pred_pairs[[1]])) +
   coord_fixed() +
   ggtitle("Test Errors for Benchmark Model [held out fold 1]")
 
-## ---- svd-model ----
+## ---- baseline-with-shrink ----
+# manually chosen point to shrink towards points chosen by eye
+caret_opts$postprocess_fun <- function(y) shrink_to_centers(y, c(10, 30, 50, 70, 90), 0.1)
+glmnet_res_shrink <- evaluate(data_list, caret_train, caret_opts, caret_predict)
 
+trained_model <- caret_train(data_list, caret_opts)
+y_hat <- caret_predict(trained_model, data_list)
+training_errs <- data.frame(y = data_list$train$Rating, y_hat = y_hat)
+RMSE(training_errs[, 1], training_errs[, 2])
+
+ggplot(training_errs) +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
+  geom_abline(b = 1, a = 0, col = "red") +
+  coord_fixed() +
+  ggtitle("Training Errors for Benchmark Model, with Shrinkage")
+
+ggplot((glmnet_res_shrink$pred_pairs[[1]])) +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
+  geom_abline(b = 1, a = 0, col = "red") +
+  coord_fixed() +
+  ggtitle("Test Errors for Benchmark Model, with Shrinkage [held out fold 1]")
+
+## ---- svd-model ----
+train <- train %>%
+  group_by(User) %>%
+  mutate(n = n()) %>%
+  arrange(desc(n))
+train$n <- NULL
+
+words_small <- words %>% filter(User %in% train$User[1:10000])
+users_small <- users %>% filter(User %in% train$User[1:10000])
+data_list <- list(train = train[1:10000, ],
+                             words = words_small,
+                             users = users_small)
+
+svd_results <- evaluate(data_list, svd_train, list(k = 5), svd_predict)
+svd_results
+
+## ---- svd-model-plot ----
+ggplot(svd_results$pred_pairs[[1]]) +
+  geom_abline(aes(a = 0, b = 1), col = "red") +
+  geom_point(aes(y, y_hat), size = 1) +
+  coord_fixed() +
+  ggtitle("SVD Predictions [Fold 1]")
+
+## ---- svd-model-study ----
+# study actual prediction values, at each step
+mR_test <- data.table(newdata$train[, svd_model$opts$keep_cols, with = F], Rating = 0)
+mR <- rbind(svd_model$mR, mR_test)
+R <- cast_ratings(mR)
+
+# Supplied ratings matrix
+R[1:10, 1:10]
+
+# imputed ratings matrix
+R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
+round(R_hat[1:10, 1:10], 2)
+
+## ---- svd-model-study-scatter ----
+svd_preds_study <- data.frame(R = as.numeric(R),
+                              R_hat = as.numeric(R_hat),
+                              missing = as.numeric(is.na(R)))
+svd_preds_study[svd_preds_study$missing == 1, "R"] <- -1
+ggplot(svd_preds_study) +
+  geom_point(aes(x = R, y = R_hat, col = as.factor(missing)), size = 1, alpha = 0.5) +
+  coord_fixed() +
+  geom_abline(b = 0, a = 1, col = "red")
+
+## ---- svd-model-study-histo ----
+ggplot(svd_preds_study) +
+  geom_histogram(aes(x = R_hat), binwidth = 2) +
+  facet_grid(missing ~ ., scale = "free_y")
 
 ## ---- svd-with-cov ----
-words_small <- words %>% filter(User %in% train$User[1:1000])
-users_small <- users %>% filter(User %in% train$User[1:1000])
-
-# need to do imputation on words, because covariates optimization assumes full Z
-# matrix is available
+# imputation on words
 words_num <- as.matrix(words_small[, -c(1:2), with = F])
 words_hat <- SVDImpute(words_num, k = 5, num.iters = 20, verbose = FALSE)
 words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
 
-data_list <- list(train = train[1:900, ],
-                  words = words_small,
-                  users = users_small)
-newdata <- list(train = train[901:1000, ],
-                  words = words_small,
-                  users = users_small)
-
-svd_cov_model <- svd_cov_train(data_list, list(n_iter = 100))
+svd_cov_model <- svd_cov_train(data_list, list(n_iter = 4, lambdas = c(.01, .01, 1),
+                                               gamma_pq = 0.01, verbose = T))
 preds <- svd_cov_predict(svd_cov_model, newdata)
 
 # we can dissect the pieces of this prediction
-pred_data <- prepare_pred_data(data_list, data_list)
+pred_data <- prepare_pred_data(data_list, newdata)
 dim(pred_data$X)
 dim(pred_data$Z)
 
-impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, trained_model$opts)
+opts <- merge_svd_cov_opts(list(lambdas = c(0.0001, 0.0001, .01),
+                                gamma_pq = 0.001, gamma_beta = 1e-5,
+                                n_iter = 20, verbose = T))
+impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
 plot(impute_res$res$obj)
 plot(impute_res$res$P)
-plot(impute_res$res$beta)
+ggplot(data.frame(x = dimnames(pred_data$Z)[[3]], y = impute_res$res$beta)) +
+  geom_point(aes(x = reorder(x, y, mean), y = y)) +
+  theme(axis.text.x = element_text(angle = -90, size = 4))
 
 data.frame(newdata$train$Rating,
            y_hat = postprocess_preds(impute_res$X_hat, newdata))
 
 # we can also cross-validate, though if we aren't even able to overfit to the
 # training data, there isn't really much of a point.
-svd_cov_results <- evaluate(list(train = train, words = words, users = users),
+svd_cov_results <- evaluate(list(train = train[1:1000, ],
+                                 words = words_small,
+                                 users = users_small),
                             svd_cov_train, list(n_iter = 10), svd_cov_predict)
-
+svd_cov_results
 ggplot(svd_cov_results$pred_pairs[[1]]) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(aes(slope = 1, intercept = 0), col = "red") +
@@ -164,7 +232,7 @@ X_data <- generate_bern_data(k, n, d = 20)
 heatmap(X_data$X)
 
 ## ---- pca ----
-pca_res <- invisible(bern_exp_pca(X_data$X, 2, 5, 10, lambda = 0.1))
+pca_res <- bern_exp_pca(X_data$X, 2, 5, 10, lambda = 0.1)
 a_df <- data.frame(a = pca_res$A, label = X_data$copies)
 
 ## ---- exp-pca-res ----
