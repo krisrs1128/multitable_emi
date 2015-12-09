@@ -364,6 +364,7 @@ more sophisticated models).
 \end{figure}
 
 \subsection{Matrix Completion}
+\label{sec:mat_compl}
 
 We now describe the canonical matrix completion problem, and how it
 applies to this data set. Most of the discussion in this section is
@@ -440,6 +441,7 @@ every step decreases the objective, but the computational savings of
 this approach can allow for many more iterations.
 
 \subsection{Matrix Completion with Regressors}
+\label{sec:mat_compl_reg}
 
 With this formulation, it is natural to extend matrix completion to
 multiple tables. An extension that led to the best performance during
@@ -449,12 +451,92 @@ the hackathon was based on the optimization \cite{shandaemi},
   \beta \in \reals^{p}} &\sum_{\left(i, j\right) \in E}
 \left(x_{ij}^{E} - p_{i}^{T}q_{j} - \beta^{T} z_{ij}\right)^{2} + \sum_{i =
   1}^{n} \lambda_{1} \|p_{i}\|_{2}^{2} + \sum_{j = 1}^{p}
-\lambda_{2}\|q_{j}\|_{2}^{2} + \lambda_{3}\|\beta\|_{2}^{2},
+\lambda_{2}\|q_{j}\|_{2}^{2} + \lambda_{3}\|\beta\|_{2}^{2}, \label{eq:mat_compl_regress}
 \end{align}
 where $z_{ij}$ is a vector containing both the user survey results and
 user-track words information the \texttt{words} and \texttt{users}
 data sets. Again, this model can be learned using gradient /
 stochastic gradient descent.
+
+\subsection{Matrix Completion Application}
+
+In this section, we document an application of these methods to the
+EMI data set, as implemented in the \texttt{emi} package. I learned a
+bit in the process, but have only achieved mixed success in the actual
+prediction task. The matrix completion approach in \ref{sec:mat_compl}
+seems quite poor. The approach in section \ref{sec:mat_compl_reg}
+seems better, but I haven't tried to tune it very much, and it does
+not scale very well, not because of the optimization (which is in
+Rcpp), but because of the data reshaping to prepare the data for
+optimization. For future reference, it should be possible to reproduce
+the winning solution, since it is
+\href{https://github.com/fancyspeed/codes_of_innovations_for_emi/tree/master/code_of_innovations}{available
+  online}, but for the moment, I'm putting this work on hold.
+
+\subsubsection{Matrix Completion}
+
+Here is an implementation of the approach described in section
+\ref{sec:mat_compl}. I am simplifying the problem by choosing the
+10,000 users with the most provided ratings, in an attempt to avoid
+the ``cold-start'' problem. Nonetheless, the predictions on held out
+data are quite poor, with RMSEs about ten points worse than the mean
+baseline.
+
+<<svd-model>>=
+@
+
+\begin{figure}
+<<svd-model-plot>>=
+@
+\label{fig:svd_held_out}
+\caption{Predictions from the SVD approach described in section
+  \ref{sec:mat_compl}, on a held out set of users. Some of the poor
+  performance can be attributed to the prevalence of 0's -- these
+  are caused by truncating the imputation results at the lowest
+  possible value\footnote{There is no reason why the matrix completion
+    algorithm has to provide results in the known $\left[0,
+      100\right]$ range.}. Even ignoring this, however, there doesn't
+  seem to be any association between predictions and truth.}
+\end{figure}
+
+What might be going on? To study the potential sources of error, we can
+look each step in the matrix completion machinery. The output below
+gives a small subview of the input and output of imputation.
+
+<<svd-model-study>>=
+@
+
+Figures \ref{fig:svd-model-scatter} and \ref{fig:svd-model-histo}
+display the predictions from this exercise. The predictions seem
+reasonable here, which suggests the difficulty above is in trying to
+generalize to new users, which is how the earlier cross-validation
+scheme was set up.
+
+\begin{figure}
+<<svd-model-study-scatter>>=
+@
+\label{fig:svd-model-scatter}
+\caption{Here we plot the predicted ratings $\hat{X}$ against the true
+ratings $X$ at observed entries $E$ (red) and unobserved entries
+$E^{C}$ (blue). The predictions seem much better than on the held out
+data in figure \ref{fig:svd_held_out}.}
+\end{figure}
+
+\begin{figure}
+<<svd-model-study-histo>>=
+@
+\caption{This gives the histogram of the predicted ratings $\hat{X}$,
+  across all users and tracks, not simply those at observed entries
+  $E$. That is, this gives a closer view at vertical blue bar at -1 in
+  figure \ref{fig:svd-model-scatter}}
+\label{fig:svd-model-histo}
+\end{figure}
+
+\subsubsection{Matrix Completion with Regressors}
+
+Next, we apply the approach that minimizes the
+objective \label{eq:mat_compl_regress}. I use SVD imputation on the
+words matrix to remove NAs.
 
 \section{Appendix}
 
