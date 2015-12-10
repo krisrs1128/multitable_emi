@@ -173,10 +173,9 @@ prepare_pred_data <- function(train_list, newdata) {
                           artist_track_map)
 
   # preprocess Z, to remove NAs [which aren't allowed in the optimization]
-  Z <- aaply(Z, 2, function(z) {
-    SVDImpute(z, k = 5, num.iters = 5, verbose = F)$x %>% scale_range()
-  })
-  Z <- aperm(Z, c(2, 1, 3))
+  for(j in seq_len(ncol(Z))) {
+    Z[, j, ] <- SVDImpute(Z[, j, ], k = 3, num.iters = 3, verbose = F)$x %>% scale_range()
+  }
   list(X = X, Z = Z)
 }
 
@@ -298,8 +297,6 @@ svd_cov_impute <- function(X, Z, opts) {
 #' @param newdata A new data_list of the same form as data_list in the input to
 #' svd_cov_train() [except it doesn't need to have a "Rating" column"]
 #' @return y_hat Predictions y_hat for every new user-track pair in the newdata.
-#' @importFrom plyr aaply
-#' @importFrom data.table melt
 #' @examples
 #' data(train)
 #' data(users)
