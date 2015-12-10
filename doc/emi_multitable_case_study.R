@@ -23,12 +23,12 @@ data(train)
 data(test)
 
 ## ---- process-data ----
-words_small <- words %>% filter(User %in% train$User[1:1000])
+words_small <- words %>% filter(User %in% train$User[1:10000])
 # imputation on words
 words_num <- as.matrix(words_small[, -c(1:2), with = F])
 words_hat <- SVDImpute(words_num, k = 5, verbose = FALSE)
 words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
-users_small <- users %>% filter(User %in% train$User[1:1000])
+users_small <- users %>% filter(User %in% train$User[1:10000])
 data_list <- list(train = train[1:10000, ], words = words_small, users = users_small)
 
 # for inspecting one fold (not full cv)
