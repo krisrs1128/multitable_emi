@@ -218,6 +218,8 @@ postprocess_preds <- function(X_hat, newdata) {
 #'  $k_factors: How many latent factors should we use for the users and tracks?
 #'  $lambdas: Regularization parameters for user factors, track factors, and
 #'   covariates regression coefficients, respectively.
+#'  $max_val The top value to truncate predictions at.
+#'  $min_val THe bottom value to truncate predictions at.
 #'  $n_iter: Number of iterations to run the (stochastic) gradient descent)
 #' @export
 merge_svd_cov_opts <- function(opts = list()) {
@@ -228,6 +230,8 @@ merge_svd_cov_opts <- function(opts = list()) {
   default_opts$gamma_beta <- 1e-8
   default_opts$k_factors <- 5
   default_opts$lambdas <- c(10, 10, 10)
+  default_opts$max_val <- 100
+  default_opts$min_val <- 0
   default_opts$n_iter <- 5
   default_opts$verbose <- FALSE
   modifyList(default_opts, opts)
@@ -276,12 +280,15 @@ svd_cov_impute <- function(X, Z, opts) {
   X_means <- rowMeans(X, na.rm = TRUE)
   X_means[is.na(X_means)] <- mean(X, na.rm = T) # some users never appear in training
   X0 <- sweep(X, 1, X_means, "-")
-  res <- do.call(svd_cov, c(list(X = X0, Z = Z), opts))
+  res <- svd_cov(X0, Z, opts$k_factors, opts$lambdas, opts$n_iter,
+                 opts$batch_samples, opts$batch_factors, opts$gamma_pq,
+                 opts$gamma_beta, opts$verbose)
 
   # get the X_hat matrix, and add back user means
   Zbeta <- apply(Z, 2, function(x) x %*% res$beta)
   X_hat <- res$P %*% t(res$Q) + Zbeta
   X_hat <- sweep(X_hat, 1, X_means, "+")
+  X_hat <- pmin(pmax(X_hat, opts$min_val), opts$max_val)
   dimnames(X_hat) <- dimnames(X)
   list(X_hat = X_hat, res = res)
 }
