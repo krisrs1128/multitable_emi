@@ -20,6 +20,8 @@ SVD imputation. The currently supported options are
  $k_factors: How many latent factors should we use for the users and tracks?
  $lambdas: Regularization parameters for user factors, track factors, and
   covariates regression coefficients, respectively.
+ $max_val The top value to truncate predictions at.
+ $min_val THe bottom value to truncate predictions at.
  $n_iter: Number of iterations to run the (stochastic) gradient descent)}
 }
 \description{

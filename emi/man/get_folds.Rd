@@ -4,9 +4,19 @@
 \alias{get_folds}
 \title{Get CV Folds for evaluation}
 \usage{
-get_folds(n = 188690, K = 5, n_rep = 1)
+get_folds(n = 188690, K = 10, n_rep = 1, contiguous = FALSE)
+}
+\arguments{
+\item{n}{How many indices have to be split into folds?}
+
+\item{K}{How many folds should be created?}
+
+\item{n_rep}{How many independent sets of cross-validation fold indices
+should be returned?}
+
+\item{contiguous}{Should the CV folds be of contiguous groups of indices?}
 }
 \description{
-Get CV Folds for evaluation
+Wrapper for caret::createFolds with some slight generalizations.
 }
 

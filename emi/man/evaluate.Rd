@@ -4,7 +4,8 @@
 \alias{evaluate}
 \title{Generic Evaluation Function}
 \usage{
-evaluate(data_list, train_fun, train_opts, pred_fun, K = 5, n_rep = 1)
+evaluate(data_list, train_fun, train_opts, pred_fun, K = 10, n_rep = 1,
+  contiguous = FALSE)
 }
 \arguments{
 \item{data_list}{A list containing the following elements, paralleling the
@@ -25,6 +26,8 @@ version of data_list returns predictions for each row of the test data.}
 \item{K}{The number of cv-folds in cross-validation.}
 
 \item{n_rep}{The number of cv replicates to perform.}
+
+\item{contiguous}{Should the CV folds be of contiguous groups of indices?}
 }
 \value{
 A list with the following elements, \cr
