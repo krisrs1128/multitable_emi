@@ -109,7 +109,7 @@ svd_predict <- function(trained_model, newdata) {
   R <- cast_ratings(mR)
 
   # get imputation results
-  R_hat <- do.call(svd_impute, c(list(R = R), opts))
+  R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
 
   # filter down to the predictions on the test cases
   postprocess_preds(R_hat, newdata)
