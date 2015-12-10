@@ -22,6 +22,20 @@ data(words)
 data(train)
 data(test)
 
+## ---- process-data ----
+words_small <- words %>% filter(User %in% train$User[1:1000])
+# imputation on words
+words_num <- as.matrix(words_small[, -c(1:2), with = F])
+words_hat <- SVDImpute(words_num, k = 5, verbose = FALSE)
+words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
+users_small <- users %>% filter(User %in% train$User[1:1000])
+data_list <- list(train = train[1:10000, ], words = words_small, users = users_small)
+
+# for inspecting one fold (not full cv)
+folds_ix <- get_folds(n = 10000, K = 10)
+train_list <- list(train = train[unlist(folds_ix[1:9]), ], words = words_small, users = users_small)
+test_list <- list(train = train[folds_ix[[10]], ], words = words_small, users = users_small)
+
 ## ---- data-dims ----
 data_dims <- data.frame(c("users", "words", "train", "test"),
                         rbind(dim(users), dim(words), dim(train), dim(test)))
@@ -89,16 +103,16 @@ ggplot(users) +
   ggtitle("Example pair of questions in users data set")
 
 ## ---- baseline-model ----
-data_list <- list(train = train[1:10000, ], users = users, words = words)
-caret_opts <- list(train_control = trainControl(number = 5, verbose = TRUE),
+caret_opts <- list(train_control = trainControl(number = 5, verbose = FALSE),
                    method = "glmnet")
 glmnet_res <- evaluate(data_list, caret_train, caret_opts, caret_predict)
+glmnet_res
 
 ## ---- elnet-preds-plot ----
 trained_model <- caret_train(data_list, caret_opts)
 y_hat <- caret_predict(trained_model, data_list)
 training_errs <- data.frame(y = data_list$train$Rating, y_hat = y_hat)
-RMSE(training_errs[, 1], training_errs[, 2])
+RMSE(training_errs[, 1], training_errs[, 2]) # training error
 
 ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
@@ -110,17 +124,18 @@ ggplot((glmnet_res$pred_pairs[[1]])) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red") +
   coord_fixed() +
-  ggtitle("Test Errors for Benchmark Model [held out fold 1]")
+  ggtitle("Test Errors for Benchmark Model [Fold 1]")
 
 ## ---- baseline-with-shrink ----
 # manually chosen point to shrink towards points chosen by eye
 caret_opts$postprocess_fun <- function(y) shrink_to_centers(y, c(10, 30, 50, 70, 90), 0.1)
 glmnet_res_shrink <- evaluate(data_list, caret_train, caret_opts, caret_predict)
+glmnet_res_shrink
 
+## ---- baseline-with-shrink-fig ----
 trained_model <- caret_train(data_list, caret_opts)
 y_hat <- caret_predict(trained_model, data_list)
 training_errs <- data.frame(y = data_list$train$Rating, y_hat = y_hat)
-RMSE(training_errs[, 1], training_errs[, 2])
 
 ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
@@ -135,15 +150,12 @@ ggplot((glmnet_res_shrink$pred_pairs[[1]])) +
   ggtitle("Test Errors for Benchmark Model, with Shrinkage [held out fold 1]")
 
 ## ---- svd-model ----
+# keep only users with lots of ratings
 train <- train %>%
   group_by(User) %>%
   mutate(n = n()) %>%
   arrange(desc(n))
 train$n <- NULL
-
-words_small <- words %>% filter(User %in% train$User[1:10000])
-users_small <- users %>% filter(User %in% train$User[1:10000])
-data_list <- list(train = train[1:10000, ], words = words_small, users = users_small)
 
 svd_results <- evaluate(data_list, svd_train, list(k = 5), svd_predict)
 svd_results
@@ -156,15 +168,15 @@ ggplot(svd_results$pred_pairs[[1]]) +
   ggtitle("SVD Predictions [Fold 1]")
 
 ## ---- svd-model-study ----
-# study actual prediction values, at each step
-mR_test <- data.table(newdata$train[, svd_model$opts$keep_cols, with = F], Rating = 0)
-mR <- rbind(svd_model$mR, mR_test)
+mR_test <- data.table(test_list$train[, c("User", "Track"), with = F], Rating = NA)
+mR <- rbind(train_list$train[, c("User", "Track", "Rating"), with = F], mR_test)
 R <- cast_ratings(mR)
 
 # Supplied ratings matrix
 R[1:10, 1:10]
 
 # imputed ratings matrix
+opts <- merge_svd_opts()
 R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
 round(R_hat[1:10, 1:10], 2)
 
@@ -184,14 +196,9 @@ ggplot(svd_preds_study) +
   facet_grid(missing ~ ., scale = "free_y")
 
 ## ---- svd-with-cov ----
-# imputation on words
-words_num <- as.matrix(words_small[, -c(1:2), with = F])
-words_hat <- SVDImpute(words_num, k = 5, num.iters = 20, verbose = FALSE)
-words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
-
 opts <- merge_svd_cov_opts(list(lambdas = c(0.0001, 0.0001, .01),
-                                gamma_pq = 0.001, gamma_beta = 1e-5,
-                                n_iter = 20, verbose = T))
+                                gamma_pq = 0.001, gamma_beta = 5e-6,
+                                n_iter = 20, verbose = FALSE))
 svd_cov_results <- evaluate(data_list, svd_cov_train, opts, svd_cov_predict)
 svd_cov_results
 
@@ -204,10 +211,11 @@ ggplot(svd_cov_results$pred_pairs[[1]]) +
 
 ## ---- svd-with-cov-data ----
 # we can dissect the pieces of this prediction
-pred_data <- prepare_pred_data(data_list, newdata)
+pred_data <- prepare_pred_data(train_list, test_list)
 pred_data$X[1:10, 1:10]
 pred_data$Z[1:3, 1:3, 1:3]
 impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
+RMSE(test_list$train$Rating, postprocess_preds(impute_res$X_hat, test_list))
 
 ## ---- svd-with-cov-obj ----
 obj <- impute_res$res$obj
@@ -223,7 +231,7 @@ ggplot(data.frame(P = impute_res$res$P, Z = pred_data$Z[,1,])) +
 ## ---- svd-with-cov-beta ----
 ggplot(data.frame(x = dimnames(pred_data$Z)[[3]], y = impute_res$res$beta)) +
   geom_point(aes(x = reorder(x, y, mean), y = y)) +
-  theme(axis.text.x = element_text(angle = -90, size = 4)) +
+  theme(axis.text.x = element_text(angle = -90, size = 7)) +
   ggtitle("Coefficients from SVD with Covariates")
 
 ## ---- simulate-bern-data ----
@@ -251,10 +259,11 @@ ggplot(mV) +
 normal_pc <- princomp(X_data$X)$scores[, 1:2]
 ggplot(data.frame(normal_pc, label = X_data$copies)) +
   geom_point(aes(x = Comp.1, y = Comp.2, col = as.factor(label))) +
-  ggtitle("Using ordinary PCA")
+  ggtitle("Using PCA")
 
 ## ---- normal-cmdscale ----
 x_dist <- dist(X_data$X, method = "jaccard")
 cmd_res <- data.frame(cmdscale(x_dist), label = X_data$copies)
 ggplot(cmd_res) +
-  geom_point(aes(x = X1, y = X2, col = as.factor(label)))
+  geom_point(aes(x = X1, y = X2, col = as.factor(label))) +
+  ggtitle("Using MDS")

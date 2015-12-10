@@ -160,8 +160,8 @@
 <<echo = FALSE>>=
 library("knitr")
 library("ggplot2")
-opts_chunk$set(cache = TRUE, fig.width = 10, fig.height = 5, fig.align = "center",
-               echo = FALSE)
+opts_chunk$set(cache = FALSE, fig.width = 10, fig.height = 5, fig.align = "center",
+               echo = FALSE, warning = F, message = F)
 theme_set(theme_bw())
 read_chunk("emi_multitable_case_study.R")
 @
@@ -171,10 +171,12 @@ read_chunk("emi_multitable_case_study.R")
 
 <<load-data>>=
 @
+<<process-data>>=
+@
 
 \linespread{1.5}
 
-\title{A Case Study in Multitable Data Analysis: The Data Science
+\title{Case Studies in Multitable Data Analysis: The Data Science
   London EMI Hackathon}
 \author{Kris Sankaran}
 
@@ -337,20 +339,19 @@ information across the tables. The procedure is as follows,
 \subsection{Baseline Regression}
 \label{sec:baseline}
 
-After performing the imputation, we train a simple elastic-net model
-on half of \texttt{train}, using the \texttt{caret} package. The
-remaining half is left for validation\footnote{There is an actual CV
-  framework being developed in the \texttt{R} package}.
+After performing the imputation, we train a simple elastic-net model,
+using the \texttt{caret} package. I am simplifying the problem by
+choosing the 10,000 users with the most provided ratings, in an
+attempt to avoid the ``cold-start'' problem.
 
 <<baseline-model>>=
 @
 
 The errors on the training and validation sets are shown in Figures
 \ref{fig:elnet_train_rmse} and \ref{fig:elnet_test_rmse},
-respectively. The RMSEs on the training and validation sets are
-\Sexpr{round(train_rmse, 5)} and \Sexpr{round(test_rmse, 5)}. The best
-performance during the hackathon was 13.19638, the Tracks-mean
-benchmark gives 21.22536.
+respectively. The RMSEs on the cross-validation folds are printed
+above. The best performance during the hackathon was 13.19638, the
+Tracks-mean benchmark gives 21.22536.
 
 This is a naive solution, which doesn't exploit the matrix completion
 structure of the true problem. Nonetheless, it is a useful benchmark to
@@ -362,6 +363,25 @@ more sophisticated models).
 \caption{To assess the performance of the baseline model, we can look
   at the predicted vs. true values on the training and test sets.}
 \label{fig:elnet_rmse}
+\end{figure}
+
+Inspecting figure \ref{fig:elnet_rmse}, it seems that we might be able
+to improve performance by shrinking predictions towards the peaks in
+the ratings histograms. Indeed, this seems to provide a slight
+improvement, as printed below, and visible in Figure
+\ref{fig:elnet_shrink_rmse}.
+
+<<baseline-with-shrink>>=
+@
+
+\begin{figure}
+<<baseline-with-shrink-fig>>=
+@
+\caption{The performance of the baseline seems to improve slightly,
+  when we shrink towards the peaks in the ratings histogram. We are
+  trying to take advantage of the fact that most survey respondents
+  tended to rate songs using round numbers.}
+\label{fig:elnet_shirnk_rmse}
 \end{figure}
 
 \subsection{Matrix Completion}
@@ -459,7 +479,7 @@ user-track words information the \texttt{words} and \texttt{users}
 data sets. Again, this model can be learned using gradient /
 stochastic gradient descent.
 
-\subsection{Matrix Completion Application}
+\subsection{Matrix Completion Implementation}
 
 In this section, we document an application of these methods to the
 EMI data set, as implemented in the \texttt{emi} package. I learned a
@@ -477,11 +497,8 @@ the winning solution, since it is
 \subsubsection{Matrix Completion}
 
 Here is an implementation of the approach described in section
-\ref{sec:mat_compl}. I am simplifying the problem by choosing the
-10,000 users with the most provided ratings, in an attempt to avoid
-the ``cold-start'' problem. Nonetheless, the predictions on held out
-data are quite poor, with RMSEs about ten points worse than the mean
-baseline.
+\ref{sec:mat_compl}. The predictions on held out data are quite poor,
+with RMSEs about ten points worse than the mean baseline.
 
 <<svd-model>>=
 @
@@ -494,9 +511,9 @@ baseline.
   \ref{sec:mat_compl}, on a held out set of users. Some of the poor
   performance can be attributed to the prevalence of 0's -- these
   are caused by truncating the imputation results at the lowest
-  possible value\footnote{There is no reason why the matrix completion
+  possible value (there is no reason why the matrix completion
     algorithm has to provide results in the known $\left[0,
-      100\right]$ range.}. Even ignoring this, however, there doesn't
+      100\right]$ range.). Even ignoring this, however, there doesn't
   seem to be any association between predictions and truth.}
 \end{figure}
 
@@ -508,19 +525,22 @@ gives a small subview of the input and output of imputation.
 @
 
 Figures \ref{fig:svd-model-scatter} and \ref{fig:svd-model-histo}
-display the predictions from this exercise. The predictions seem
-reasonable here, which suggests the difficulty above is in trying to
-generalize to new users, which is how the earlier cross-validation
-scheme was set up.
+display the predictions from this exercise. We observe many
+predictions outside the possible range, and suspect that, even after
+truncation to $\left[0, 100\right]$, they are the source of the most
+error. This suggests that tuning the scaling factor
+$\frac{np}{\absarg{E}}$ could lead to better performance in this
+approach.
 
 \begin{figure}
-<<svd-model-study-scatter>>=
+<<svd-model-study-scatter, fig.height = 9>>=
 @
 \label{fig:svd-model-scatter}
 \caption{Here we plot the predicted ratings $\hat{X}$ against the true
 ratings $X$ at observed entries $E$ (red) and unobserved entries
-$E^{C}$ (blue). The predictions seem much better than on the held out
-data in figure \ref{fig:svd_held_out}.}
+$E^{C}$ (blue). Notice that \emph{many} of the predictions are outside
+the possible range, which is the source of the many zeros in the
+predictions in figure \ref{fig:svd-held-out}.}
 \end{figure}
 
 \begin{figure}
@@ -538,8 +558,7 @@ data in figure \ref{fig:svd_held_out}.}
 Next, we apply the approach that minimizes the
 objective \label{eq:mat_compl_regress}. I am still focusing on the
 10,000 users with the most ratings, so the problem is quite a bit
-easier than the original problem studied in section
-\ref{sec:baseline}.
+easier than the problem studied in the actual hackathon.
 
 The two preprocessing steps we apply are
 \begin{itemize}
@@ -552,14 +571,12 @@ The two preprocessing steps we apply are
     the objective function.
 \end{itemize}
 
-We run a full cross-validation below. The optimization is slow, but
-exploiting both regression and matrix completion structure seems to
-have led to a gain, though again these results are not directly
-comparable to the baseline regressions from earlier (and that approach
-might do better on this simpler data set). Also, we could speed up the
-optimization using stochastic gradient descent, but the improvement
-seemed marginal in preliminary experiments, and so we are sticking to
-standard gradient descent here.
+We run a full cross-validation below. The performance is somewhat
+worse than that of the earlier baseline. Perhaps more systematic
+tuning or using more of the available data would help, but I'm a
+little surprised that the naive regression seems to have worked better
+than an optimization that is designed to take advantage of very
+specific structure in this problem.
 
 <<svd-with-cov>>=
 @
@@ -600,7 +617,7 @@ that are fed into the optimization.
 \end{figure}
 
 \begin{figure}
-<<svd-with-cov-beta>>=
+<<svd-with-cov-beta, fig.height = 9>>=
 @
 \caption{Coefficients $\beta$ associated with different
   covariates. The coefficients at the tails seem interesting, but the
