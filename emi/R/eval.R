@@ -11,12 +11,35 @@ RMSE <- function(y, y_hat) {
 }
 
 # get-folds --------------------------------------------------------------------
+#' @title Create folds of contiguous indices
+#' @param n How many indices have to be split into folds?
+#' @param K How many folds should be created?
+#' @export
+contiguous_folds <- function(n, K) {
+  v <- sort(rep(1:K, length.out = n))
+  res <- vector(mode = "list", length = K)
+  for(k in seq_len(K)) {
+    res[[k]] <- which(v == k)
+  }
+  res
+}
+
 #' @title Get CV Folds for evaluation
+#' @description Wrapper for caret::createFolds with some slight generalizations.
+#' @param n How many indices have to be split into folds?
+#' @param K How many folds should be created?
+#' @param n_rep How many independent sets of cross-validation fold indices
+#' should be returned?
+#' @param contiguous Should the CV folds be of contiguous groups of indices?
 #' @importFrom caret createFolds
 #' @importFrom devtools use_data
 #' @export
-get_folds <- function(n = 188690, K = 5, n_rep = 1) {
-  replicate(n_rep, createFolds(seq_len(n), k = K), simplify = T)
+get_folds <- function(n = 188690, K = 10, n_rep = 1, contiguous = FALSE) {
+  if(contiguous) {
+    replicate(n_rep, contiguous_folds(n, K), simplify = T)
+  } else {
+    replicate(n_rep, createFolds(seq_len(n), k = K), simplify = T)
+  }
 }
 
 # evaluation -------------------------------------------------------------------
@@ -34,6 +57,7 @@ get_folds <- function(n = 188690, K = 5, n_rep = 1) {
 #' version of data_list returns predictions for each row of the test data.
 #' @param K The number of cv-folds in cross-validation.
 #' @param n_rep The number of cv replicates to perform.
+#' @param contiguous Should the CV folds be of contiguous groups of indices?
 #' @return A list with the following elements, \cr
 #'    mean_rmse: The mean of the RMSEs calculated over reps and folds.
 #'    err: A K x n_rep matrix, whose kj^th element gives the error when holding
@@ -42,16 +66,15 @@ get_folds <- function(n = 188690, K = 5, n_rep = 1) {
 #'    and predicted ratings.
 #' @export
 evaluate <- function(data_list, train_fun, train_opts, pred_fun,
-                     K = 5, n_rep = 1) {
+                     K = 10, n_rep = 1, contiguous = FALSE) {
   # extract cv folds
-  folds_ix <- get_folds(nrow(data_list$train), K, n_rep)
+  folds_ix <- get_folds(nrow(data_list$train), K, n_rep, contiguous)
   errs <- matrix(NA, nrow(folds_ix), ncol(folds_ix))
   pred_pairs <- matrix(list(), nrow(folds_ix), ncol(folds_ix))
 
   # loop over reps and fold indices
   for(cur_rep in seq_len(n_rep)) {
     for(cur_k in seq_len(K)) {
-
       cat(sprintf("Starting fold %g of rep %g \n", cur_k, cur_rep))
 
       # get current training and testing data
@@ -64,7 +87,7 @@ evaluate <- function(data_list, train_fun, train_opts, pred_fun,
       # train and evaluate model
       cur_model <- train_fun(train_data_list, train_opts)
       cur_preds <- pred_fun(cur_model, test_data_list)
-      truth <- unlist(test_data_list$train[, "Rating", with = F])
+      truth <- test_data_list$train$Rating
       errs[cur_k, cur_rep] <- RMSE(cur_preds, truth)
       pred_pairs[[cur_k, cur_rep]] <- data.frame(y = truth, y_hat = cur_preds)
     }
