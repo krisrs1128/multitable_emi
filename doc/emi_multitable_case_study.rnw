@@ -1,4 +1,4 @@
-\documentclass{article}\usepackage{graphicx, color}
+\documentclass{scrartcl}\usepackage{graphicx, color}
 \usepackage{eulervm}
 %% maxwidth is the original width if it is less than linewidth
 %% otherwise use linewidth (to make sure the graphics do not exceed the margin)
@@ -150,6 +150,7 @@
 \newcommand{\toprob}{\xrightarrow{\mathbb{P}}}
 \newcommand{\laweq}{\overset{\mathcal{L}}{=}}
 \newcommand{\F}{\mathcal{F}}
+\renewenvironment{knitrout}{\begin{singlespace}}{\end{singlespace}}
 %-----------------------
 % Math environments
 %-----------------------
@@ -160,9 +161,23 @@
 <<echo = FALSE>>=
 library("knitr")
 library("ggplot2")
-opts_chunk$set(cache = FALSE, fig.width = 10, fig.height = 5, fig.align = "center",
+library("grid")
+set.seed(12102015)
+opts_chunk$set(cache = TRUE, fig.width = 10, fig.height = 4, fig.align = "center",
                echo = FALSE, warning = F, message = F)
-theme_set(theme_bw())
+scale_colour_discrete <- function(...)
+  scale_colour_brewer(..., palette="Set2")
+small_theme <- function(base_size = 7, base_family = "Helvetica") {
+  theme_bw(base_size = base_size, base_family = base_family) %+replace%
+  theme(axis.title = element_text(size = rel(0.8)),
+        legend.title = element_text(size = rel(0.8)),
+        legend.text = element_text(size = rel(0.8)),
+        plot.title = element_text(size = rel(1.1)),
+        plot.margin = unit(c(0.1, .1, .1, .1), "lines")
+        )
+}
+theme_set(small_theme())
+
 read_chunk("emi_multitable_case_study.R")
 @
 
@@ -347,18 +362,17 @@ attempt to avoid the ``cold-start'' problem.
 <<baseline-model>>=
 @
 
-The errors on the training and validation sets are shown in Figures
-\ref{fig:elnet_train_rmse} and \ref{fig:elnet_test_rmse},
-respectively. The RMSEs on the cross-validation folds are printed
-above. The best performance during the hackathon was 13.19638, the
-Tracks-mean benchmark gives 21.22536.
+The errors on the training and validation sets are shown in Figure
+\ref{fig:elnet_rmse}. The RMSEs on the cross-validation folds are
+printed above. The best performance during the hackathon was 13.19638,
+the Tracks-mean benchmark gives 21.22536.
 
 This is a naive solution, which doesn't exploit the matrix completion
 structure of the true problem. Nonetheless, it is a useful benchmark to
 have available when evaluating performance of alternative (supposedly
 more sophisticated models).
 \begin{figure}
-<<elnet-preds-plot>>=
+<<elnet-preds-plot, fig.show = "hold", fig.align = "left">>=
 @
 \caption{To assess the performance of the baseline model, we can look
   at the predicted vs. true values on the training and test sets.}
@@ -375,13 +389,25 @@ improvement, as printed below, and visible in Figure
 @
 
 \begin{figure}
-<<baseline-with-shrink-fig>>=
+<<baseline-with-shrink-fig, fig.show = "hold", fig.align = "left">>=
 @
 \caption{The performance of the baseline seems to improve slightly,
   when we shrink towards the peaks in the ratings histogram. We are
   trying to take advantage of the fact that most survey respondents
   tended to rate songs using round numbers.}
-\label{fig:elnet_shirnk_rmse}
+\label{fig:elnet_shrink_rmse}
+\end{figure}
+
+\begin{figure}
+<<vis-beta-shrink, fig.height = 9>>=
+@
+\caption{We can use predictive modeling as an exploratory tool, in
+  this case by visualizing the elastic-net coefficient paths for the
+  100 most important coefficients (those with largest average absolute
+  value across the full path). Each row is a coefficient, and the
+  $x$-axis traces out a path of $\lambda$ penalty values, from
+  stringent (left) to relaxed (right).}
+\label{fig:vis-beta-shrink}
 \end{figure}
 
 \subsection{Matrix Completion}
@@ -529,18 +555,16 @@ display the predictions from this exercise. We observe many
 predictions outside the possible range, and suspect that, even after
 truncation to $\left[0, 100\right]$, they are the source of the most
 error. This suggests that tuning the scaling factor
-$\frac{np}{\absarg{E}}$ could lead to better performance in this
-approach.
+(rather than setting it at $\frac{np}{\absarg{E}}$) could lead to
+better performance in this approach.
 
 \begin{figure}
-<<svd-model-study-scatter, fig.height = 9>>=
+<<svd-model-study-scatter, fig.height = 4>>=
 @
 \label{fig:svd-model-scatter}
 \caption{Here we plot the predicted ratings $\hat{X}$ against the true
 ratings $X$ at observed entries $E$ (red) and unobserved entries
-$E^{C}$ (blue). Notice that \emph{many} of the predictions are outside
-the possible range, which is the source of the many zeros in the
-predictions in figure \ref{fig:svd-held-out}.}
+$E^{C}$ (blue).}
 \end{figure}
 
 \begin{figure}
@@ -617,7 +641,7 @@ that are fed into the optimization.
 \end{figure}
 
 \begin{figure}
-<<svd-with-cov-beta, fig.height = 9>>=
+<<svd-with-cov-beta, fig.height = 7>>=
 @
 \caption{Coefficients $\beta$ associated with different
   covariates. The coefficients at the tails seem interesting, but the
@@ -625,6 +649,23 @@ that are fed into the optimization.
   optimization with initialize with gaussian $beta$.}
 \label{fig:svd-cov-scores}
 \end{figure}
+
+\section{Conclusion}
+
+Our work so far has revolved around reproducing earlier predictive
+modeling efforts, to get a sense of the practice of machine
+learning. An idea that surfaced in a few disjoint places\footnote{For
+  example, the different coefficient plots, and the (admittedly
+  half-baked) display of latent scores.}, but which was never really
+developed, was that these same efforts can serve as a prelude to
+interesting interpretive and inferential work. Of course, it would be
+silly to pretend to ``understand'' a data set like this, if it were
+not first possible to answer the most obvious question associated with
+it -- what makes someone like a song? -- but also too bad if that were
+as far the analysis went. What I mean is that, even though this is the
+end of my work on this data set for now, I suspect it will become an
+interesting testing ground for new multitable ideas that meld
+predictive and exploratory perspectives.
 
 \section{Appendix}
 
@@ -731,7 +772,7 @@ test will be applying alternative methods to mixed data.
 @
 \caption{The scores recovered by exponential family PCA on the
   simulated data.}
-\label{fig:bern_heatmap}
+\label{fig:exp_pca_res}
 \end{figure}
 
 \begin{figure}
@@ -739,7 +780,7 @@ test will be applying alternative methods to mixed data.
 @
 \caption{The subspace recovered by exponential family PCA on the
   simulated data.}
-\label{fig:bern_heatmap}
+\label{fig:exp_pca_subspace}
 \end{figure}
 
 \begin{figure}

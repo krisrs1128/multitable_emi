@@ -23,16 +23,24 @@ data(train)
 data(test)
 
 ## ---- process-data ----
-words_small <- words %>% filter(User %in% train$User[1:10000])
+# keep only users with lots of ratings
+train <- train %>%
+  group_by(User) %>%
+  mutate(n = n()) %>%
+  arrange(desc(n))
+train$n <- NULL
+
+n <- 20000
+words_small <- words %>% filter(User %in% train$User[1:n])
 # imputation on words
 words_num <- as.matrix(words_small[, -c(1:2), with = F])
 words_hat <- SVDImpute(words_num, k = 5, verbose = FALSE)
 words_small <- data.table(words_small[, 1:2, with = F], words_hat$x)
-users_small <- users %>% filter(User %in% train$User[1:10000])
-data_list <- list(train = train[1:10000, ], words = words_small, users = users_small)
+users_small <- users %>% filter(User %in% train$User[1:n])
+data_list <- list(train = train[1:n, ], words = words_small, users = users_small)
 
 # for inspecting one fold (not full cv)
-folds_ix <- get_folds(n = 10000, K = 10)
+folds_ix <- get_folds(n = n, K = 10)
 train_list <- list(train = train[unlist(folds_ix[1:9]), ], words = words_small, users = users_small)
 test_list <- list(train = train[folds_ix[[10]], ], words = words_small, users = users_small)
 
@@ -100,6 +108,7 @@ ggplot(users) +
                  geom = "polygon", bins = 150, h = 10, alpha = 0.6) +
   scale_fill_gradient(low = "white", high = "indianred") +
   geom_point(aes(x = I.love.technology, y = People.often.ask.my.advice.on.music.what.to.listen.to), alpha = 0.1, size = 1) +
+  coord_fixed() +
   ggtitle("Example pair of questions in users data set")
 
 ## ---- baseline-model ----
@@ -116,13 +125,13 @@ RMSE(training_errs[, 1], training_errs[, 2]) # training error
 
 ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
-  geom_abline(b = 1, a = 0, col = "red") +
+  geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Training Errors for Benchmark Model")
 
 ggplot((glmnet_res$pred_pairs[[1]])) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
-  geom_abline(b = 1, a = 0, col = "red") +
+  geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Test Errors for Benchmark Model [Fold 1]")
 
@@ -139,30 +148,31 @@ training_errs <- data.frame(y = data_list$train$Rating, y_hat = y_hat)
 
 ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
-  geom_abline(b = 1, a = 0, col = "red") +
+  geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Training Errors for Benchmark Model, with Shrinkage")
 
 ggplot((glmnet_res_shrink$pred_pairs[[1]])) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
-  geom_abline(b = 1, a = 0, col = "red") +
+  geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Test Errors for Benchmark Model, with Shrinkage [held out fold 1]")
 
-## ---- svd-model ----
-# keep only users with lots of ratings
-train <- train %>%
-  group_by(User) %>%
-  mutate(n = n()) %>%
-  arrange(desc(n))
-train$n <- NULL
+## ---- vis-beta-shrink ----
+model_coef <- coef(trained_model$model$finalModel)[-1, ] # remove intercept
+abs_means <- apply(model_coef, 1, function(x) mean(abs(x)))
+small_coef <- model_coef[order(abs_means, decreasing = T)[1:100], ]
+plot_lasso_coef(small_coef) +
+  theme(axis.text.y = element_text(size = 6)) +
+  ggtitle("Important Coefficients from Elastic Net")
 
+## ---- svd-model ----
 svd_results <- evaluate(data_list, svd_train, list(k = 5), svd_predict)
 svd_results
 
 ## ---- svd-model-plot ----
 ggplot(svd_results$pred_pairs[[1]]) +
-  geom_abline(aes(a = 0, b = 1), col = "red") +
+  geom_abline(aes(a = 0, b = 1), col = "red", alpha = 0.6) +
   geom_point(aes(y, y_hat), size = 1) +
   coord_fixed() +
   ggtitle("SVD Predictions [Fold 1]")
@@ -181,37 +191,46 @@ R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
 round(R_hat[1:10, 1:10], 2)
 
 ## ---- svd-model-study-scatter ----
-svd_preds_study <- data.frame(R = as.numeric(R),
-                              R_hat = as.numeric(R_hat),
-                              missing = as.numeric(is.na(R)))
-svd_preds_study[svd_preds_study$missing == 1, "R"] <- -1
+svd_preds_study <- rbind(data.frame(type = "truth", melt(R)),
+                         data.frame(type = "pred", melt(R_hat)))
+svd_preds_study$test <- svd_preds_study$Var1 %in% mR_test$User
+svd_preds_study <- svd_preds_study %>%
+  dcast(Var1 + Var2 + test ~ type, value.var = "value") %>%
+  filter(!is.na(truth))
+
 ggplot(svd_preds_study) +
-  geom_point(aes(x = R, y = R_hat, col = as.factor(missing)), size = 1, alpha = 0.5) +
+  geom_point(aes(x = truth, y = pred, col = test), size = 1, alpha = .9) +
   coord_fixed() +
-  geom_abline(b = 0, a = 1, col = "red")
+  geom_abline(b = 0, a = 1, col = "red", alpha = 0.6) +
+  ggtitle("SVD Imputation Predictions")
 
 ## ---- svd-model-study-histo ----
-ggplot(svd_preds_study) +
-  geom_histogram(aes(x = R_hat), binwidth = 2) +
-  facet_grid(missing ~ ., scale = "free_y")
+ggplot(melt(svd_preds_study, id.vars = c("Var1", "Var2", "test"))) +
+  geom_histogram(aes(x = value), binwidth = 2) +
+  facet_grid(variable ~ ., scale = "free_y") +
+  ggtitle("SVD Imputation, Truth and Predictions")
+
+head(svd_preds_study)
 
 ## ---- svd-with-cov ----
 opts <- merge_svd_cov_opts(list(lambdas = c(0.0001, 0.0001, .01),
                                 gamma_pq = 0.001, gamma_beta = 5e-6,
-                                n_iter = 20, verbose = FALSE))
+                                n_iter = 20, verbose = TRUE))
 svd_cov_results <- evaluate(data_list, svd_cov_train, opts, svd_cov_predict)
 svd_cov_results
 
 ## ---- svd-with-cov-scatter ----
 ggplot(svd_cov_results$pred_pairs[[1]]) +
-  geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
-  geom_abline(aes(slope = 1, intercept = 0), col = "red") +
+  geom_point(aes(x = y, y = y_hat), alpha = 0.9) +
+  geom_abline(aes(slope = 1, intercept = 0), col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Predictions from SVD with Covariates [Fold 1]")
 
 ## ---- svd-with-cov-data ----
 # we can dissect the pieces of this prediction
-pred_data <- prepare_pred_data(train_list, test_list)
+pred_data <- list()
+pred_data$X <- prepare_pred_X(train_list, test_list)
+pred_data$Z <- prepare_pred_Z(train_list, test_list, dimnames(pred_data$X))
 pred_data$X[1:10, 1:10]
 pred_data$Z[1:3, 1:3, 1:3]
 impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
