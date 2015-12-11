@@ -169,14 +169,57 @@ prepare_pred_data <- function(train_list, newdata) {
   # prepare the data
   artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
   X <- cast_ratings(train[, c("User", "Track", "Rating"), with = F])
-  Z <- prepare_covariates(users, words, rownames(X), colnames(X),
+}
+
+#' @title Merge train and test data to create ratings matrix
+#' @param train_list A data_list of the form
+#'  $train: A data.frame giving the artist, track, user, rating, and time info. \cr
+#'  $words: A matrix giving word indicators for artist-user pairs. \cr
+#'  $users: A matrix givin gsurvey results for each user. \cr
+#' @param newdata A test data_list, of the same form as train_list.
+#' @return X A user x track rating matrix
+#' @export
+prepare_pred_X <- function(train_list, newdata) {
+  # merge training with new data (with ratings as NAs)
+  newdata$train$Rating <- NA
+  train <- merge_intersect(train_list$train, newdata$train)
+  rm(train_list, newdata)
+
+  # cast the data
+  artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
+  cast_ratings(train[, c("User", "Track", "Rating"), with = F])
+}
+
+#' @title Merge train and test data, for imputation in Z
+#' @param train_list A data_list of the form
+#'  $train: A data.frame giving the artist, track, user, rating, and time info. \cr
+#'  $words: A matrix giving word indicators for artist-user pairs. \cr
+#'  $users: A matrix givin gsurvey results for each user. \cr
+#' @param newdata A test data_list, of the same form as train_list.
+#' @param x_dimnames A list of dimnames of the ratings matrix.
+#' @return Z A user x track x question covariates matrix.
+#' @importFrom imputation SVDImpute
+#' @export
+prepare_pred_Z <- function(train_list, newdata, x_dimnames) {
+  # merge training with new data (with ratings as NAs)
+  newdata$train$Rating <- NA
+  train <- merge_intersect(train_list$train, newdata$train)
+  users <- merge_intersect(train_list$users, newdata$users)
+  words <- merge_intersect(train_list$words, newdata$words)
+  rm(train_list, newdata)
+
+  # prepare the data
+  artist_track_map <- unique(train[, c("Artist", "Track"), with = F])
+  rm(train)
+  Z <- prepare_covariates(users, words, x_dimnames[[1]], x_dimnames[[2]],
                           artist_track_map)
+  rm(users, words)
 
   # preprocess Z, to remove NAs [which aren't allowed in the optimization]
   for(j in seq_len(ncol(Z))) {
     Z[, j, ] <- SVDImpute(Z[, j, ], k = 3, num.iters = 3, verbose = F)$x %>% scale_range()
   }
-  list(X = X, Z = Z)
+  Z
 }
 
 #' @title Extract predictions from X_hat matrix
@@ -308,11 +351,16 @@ svd_cov_impute <- function(X, Z, opts) {
 #' @export
 svd_cov_predict <- function(trained_model, newdata) {
   message("Preparing data for imputation.")
-  pred_data <- prepare_pred_data(trained_model$data_list, newdata)
+  pred_data <- list()
+  pred_data$X <- prepare_pred_X(trained_model$data_list, newdata)
+  pred_data$Z <- prepare_pred_Z(trained_model$data_list, newdata, dimnames(pred_data$X))
+  trained_model$data_list <- NULL
 
   message("Training model.")
   impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, trained_model$opts)
+  rm(pred_data)
 
   message("Extracting predictions from imputed matrix.")
   postprocess_preds(impute_res$X_hat, newdata)
 }
+
