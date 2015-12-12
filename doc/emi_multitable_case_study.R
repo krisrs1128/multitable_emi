@@ -183,12 +183,12 @@ mR <- rbind(train_list$train[, c("User", "Track", "Rating"), with = F], mR_test)
 R <- cast_ratings(mR)
 
 # Supplied ratings matrix
-R[1:10, 1:10]
+R[1:5, 1:5]
 
 # imputed ratings matrix
 opts <- merge_svd_opts()
 R_hat <- svd_impute(R, opts$k, opts$alpha, opts$min_val, opts$max_val)
-round(R_hat[1:10, 1:10], 2)
+round(R_hat[1:5, 1:5], 2)
 
 ## ---- svd-model-study-scatter ----
 svd_preds_study <- rbind(data.frame(type = "truth", melt(R)),
@@ -231,7 +231,7 @@ ggplot(svd_cov_results$pred_pairs[[1]]) +
 pred_data <- list()
 pred_data$X <- prepare_pred_X(train_list, test_list)
 pred_data$Z <- prepare_pred_Z(train_list, test_list, dimnames(pred_data$X))
-pred_data$X[1:10, 1:10]
+pred_data$X[1:5, 1:5]
 pred_data$Z[1:3, 1:3, 1:3]
 impute_res <- svd_cov_impute(pred_data$X, pred_data$Z, opts)
 RMSE(test_list$train$Rating, postprocess_preds(impute_res$X_hat, test_list))

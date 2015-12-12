@@ -200,23 +200,23 @@ read_chunk("emi_multitable_case_study.R")
 
 \section{Introduction}
 
-The Data Science London EMI Hackathon was a one day hackathon
-sponsored by Data Science London and Kaggle. The general question is
-to predict whether a music listener will enjoy a particular track,
-given their previously expressed preferences and those of their
-peers. From this view, it was a standard netflix-style matrix
-completion problem, and indeed, the winning entries formulated the
-problem in this way.
+The Data Science London EMI Hackathon was a one-day hackathon
+sponsored by Data Science London and Kaggle. The goal was
+to predict how much a listener would enjoy new songs, given their
+previous preferences and those of their peers. From this view, it was
+a standard Netflix-style matrix completion problem, and
+unsurprisingly, the winning entries formulated the problem in this
+way.
 
-However, some wrinkles are introduced by the inclusion of supplemental
-data sets for creating these predictions. It is exactly this
-additional information that makes the problem interesting from a
-multitable point of view. Indeed, this data presents the opportunity
-for synthesizing matrix-completion and multitable data analysis methods.
+However, the inclusion of supplemental data added some wrinkles to
+this otherwise standard task. It is this additional information that
+makes the problem interesting from a multitable perspective -- it
+motivates the synthesis of matrix completion and multitable data
+analysis methods.
 
-As usual, the experiments described in this report are vignettes in
-an \texttt{R} package, available publicly
-\href{https://github.com/krisrs1128/multitable_emi/tree/master/emi}{here}.
+As usual, this report
+\href{https://github.com/krisrs1128/multitable_emi/tree/master/doc}{is
+  reproducible}.
 
 \section{Available Data}
 
@@ -224,33 +224,30 @@ There are four data sets of interest, which we call \texttt{train},
 \texttt{test}, \texttt{users}, and \texttt{words}. \texttt{train} and
 \texttt{test} seem to be from the exact same matrix, but with entries
 randomly dropped for testing. If they were the only data sets
-available, this problem would be exactly a matrix completion
-problem. We summarize the data sets in the list below. The data
-dimensions are given in Table \ref{tab:data_dims}.
+available, this problem would be exactly matrix completion. We
+summarize the data sets in the list below. The data dimensions are
+given in Table \ref{tab:data_dims}.
 
 \begin{itemize}
 \item \texttt{train}: Each row specifies a ``Track - User'' pair. The
-  response of interest, which we need to predict in \texttt{test}, is
-  a ratings column, taking values between 0 and 100. In addition, for
-  each track, we have an ID for   the artist who wrote it. Last, since
-  this data was collected over several sessions, during which the
-  population of people surveyed could vary substantially, there is a
-  ``Time'' column specifying during which survey session the data was
-  collected. Plots of the number of times the different artists,
-  tracks, users, and survey sessions appeared in the training and test
-  data are in Figures \ref{fig:artist_hist},
+  response of interest is a ratings column, taking values between 0
+  and 100. In addition, for each track, we have an ID for   the artist
+  who wrote it. Last, since this data was collected over several
+  sessions, during which the population of people surveyed could vary,
+  there is a ``Time'' column specifying the survey session during
+  which the data was collected. Plots of the number of times
+  the different artists, tracks, users, and survey sessions appeared
+  in the training and test data are in Figures \ref{fig:artist_hist},
   \ref{fig:track_hist}, and \ref{fig:user_counts}. The ratings
   histogram is multimodal, see Figure \ref{fig:rating_hist}.
 \item \texttt{test}: This data has the same form as \texttt{train},
   but ommiting the ratings column.
 \item \texttt{users}: This is a survey data set taken on many, though
   not all, users in the training / test data set. It is split into
-  different themes -- one part asks general demographic information
-  (in what region of Britain are they from, what kind of employment do
-  they have, what is their age) and another asks general questions
-  about the role of music in the users life. This is the only data set
-  that doesn't include any information about the artists. An example
-  of the kinds of responses available is plotted in Figure
+  two parts -- a demographic survey and general questions about the
+  role of music in the respondent's life. This is the only data set that
+  doesn't include any information about the artists. An example of the
+  kinds of responses available is plotted in Figure
   \ref{fig:user-pair}. Two general takeaways from this data set are
   that the actual scores are multimodal, as in the raw ratings in
   \texttt{train}, and many questions are very redundant.
@@ -260,12 +257,12 @@ dimensions are given in Table \ref{tab:data_dims}.
   track, the user is asked to label 0-1 for whether certain words
   describe the track (``Way out'', ``Cool'', ``Catchy'', ...).  There
   are a few other binary questions, like whether the user likes the
-  artist or owns any music by that artist. One important property of
+  artist or owns any music by that artist. One property of
   this data set is that, during each session, only a subset of about
   two-thirds of questions are asked. So, there is a lot of
-  missingness, but only 16 missingness patterns per sample (there are
+  missingness, but only 16 missingness patterns (there are
   17 survey sessions, the overlap is perfect except for two sessions
-  with the same question pattern).
+  with the same missingness pattern).
 \end{itemize}
 
 <<data-dims, results = "asis">>=
@@ -317,30 +314,29 @@ dimensions are given in Table \ref{tab:data_dims}.
 
 \section{Analysis}
 
-We have considered a few strategies for prediction. In this section,
-we review a baseline based on featurizing user-artist pairs, but not
-sharing information across similar users. We then review the basic
-matrix completion problem and an extension designed to allow inclusion
-of external information, which was the basis of the winning solutions
-in the actual hackathon.
+We have considered a few strategies for prediction. First, we review a
+baseline based on featurizing user-artist pairs, but not sharing
+information across similar users. We then review the basic matrix
+completion problem and an extension designed to allow inclusion of
+external information, which was the basis of the winning solutions in
+the actual hackathon.
 
 \subsection{Featurization}
 
-Our baseline model doesn't explicitly apply any matrix completion
-ideas. The idea is, for each user-artist pair, create a feature vector
-consisting of,
+Our baseline doesn't apply any matrix completion ideas: for each
+user-artist pair, create a feature vector consisting of,
 \begin{itemize}
   \item If available, the current user's response to the survey.
   \item If the current user-track pair appeared in the training data,
-    include the binary words indicator vector for that pair.
-  \item Include indicators for the current artist and track, based on
+    the binary words indicator vector for that pair.
+  \item Indicator variables for the current artist and track, based on
     the data in \texttt{train}.
 \end{itemize}
 
-This matrix has many NA values, since there will inevitably be
-user-track pairs that we didn't observe in the training data. To deal
-with this, we use SVD imputation, which exploits multivariate
-information across the tables. The procedure is as follows,
+This matrix has many NA values, since these three sources of features
+are rarely all present. To deal with this, we use SVD imputation,
+which exploits multivariate information across the tables
+\cite{hastie1999imputing}. The procedure is as follows,
 \begin{itemize}
   \item Impute all missing values with the means for their columns.
   \item Compute a rank-$k$ approximation of the mean-imputed matrix by
@@ -348,16 +344,21 @@ information across the tables. The procedure is as follows,
     that index.
   \item Compute a rank-$k$ approximation to the result of the first
     iteration, and substitute the new approximation values at the
-    missing-indices. Iterate this to convergence.
+    missing-indices.
+  \item Iterate this to convergence.
 \end{itemize}
 
 \subsection{Baseline Regression}
 \label{sec:baseline}
 
 After performing the imputation, we train a simple elastic-net model,
-using the \texttt{caret} package. I am simplifying the problem by
-choosing the 10,000 users with the most provided ratings, in an
-attempt to avoid the ``cold-start'' problem.
+using the \texttt{caret} package \cite{zou2005regularization,
+  kuhn2008building}. I am simplifying the problem by choosing the
+10,000 users who rated the most tracks, since I want things to be
+easy\footnote{That said, I am not sure how this effects the RMSEs --
+  on the one hand, were are avoiding the ``cold-start'' problem, which
+  should help performance, on the other, we are ignoring data, which
+  deteriorates it.}
 
 <<baseline-model>>=
 @
@@ -365,12 +366,12 @@ attempt to avoid the ``cold-start'' problem.
 The errors on the training and validation sets are shown in Figure
 \ref{fig:elnet_rmse}. The RMSEs on the cross-validation folds are
 printed above. The best performance during the hackathon was 13.19638,
-the Tracks-mean benchmark gives 21.22536.
+the Tracks-mean benchmark gives 21.22536, but again, our problem is
+not directly comparable.
 
 This is a naive solution, which doesn't exploit the matrix completion
-structure of the true problem. Nonetheless, it is a useful benchmark to
-have available when evaluating performance of alternative (supposedly
-more sophisticated models).
+structure of the true problem. It turns out that this is the best I
+can do, at least with my current implementations.
 \begin{figure}
 <<elnet-preds-plot, fig.show = "hold", fig.align = "left">>=
 @
@@ -381,8 +382,8 @@ more sophisticated models).
 
 Inspecting figure \ref{fig:elnet_rmse}, it seems that we might be able
 to improve performance by shrinking predictions towards the peaks in
-the ratings histograms. Indeed, this seems to provide a slight
-improvement, as printed below, and visible in Figure
+the ratings histograms. However, this doesn't seem to change much --
+see the RMSEs printed below, and also Figure
 \ref{fig:elnet_shrink_rmse}.
 
 <<baseline-with-shrink>>=
@@ -391,10 +392,10 @@ improvement, as printed below, and visible in Figure
 \begin{figure}
 <<baseline-with-shrink-fig, fig.show = "hold", fig.align = "left">>=
 @
-\caption{The performance of the baseline seems to improve slightly,
-  when we shrink towards the peaks in the ratings histogram. We are
-  trying to take advantage of the fact that most survey respondents
-  tended to rate songs using round numbers.}
+\caption{The performance of the baseline seems when we shrink towards
+  the peaks in the ratings histogram (this explains the empty
+  horizontal bands). We are trying to take advantage of the fact that
+  most survey respondents tended to rate songs using round numbers.}
 \label{fig:elnet_shrink_rmse}
 \end{figure}
 
@@ -414,12 +415,12 @@ improvement, as printed below, and visible in Figure
 \label{sec:mat_compl}
 
 We now describe the canonical matrix completion problem, and how it
-applies to this data set. Most of the discussion in this section is
+applies to this data set. Most of the discussion here is
 based on notes from Andrea Montanari's course on ``Inference,
 Estimation, and Information Processing'' and
 \cite{keshavan2010matrix}.
 
-Let $X \in \reals^{n \times p}$ be a matrix of users vs. tracks. We
+Let $X \in \reals^{n \times p}$ be a matrix of users $\times$ tracks. We
 imagine that, in the $ij^{th}$ cell, there is a rating for how much
 user $i$ would enjoy track $j$. Now, since most users have listened to
 at most a very small fraction of tracks, in reality we have access to
@@ -431,14 +432,14 @@ low-rank matrix -- many users have similar tastes, and many tracks
 sound alike. Formally, we apply the following procedure.
 
 \begin{itemize}
-  \item Estimate mean ratings for each user, among the observed
-    entries, $\hat{b}_{i} \in \reals^{n}$.
+  \item Estimate $\hat{b}_{i} \in \reals^{n}$, the mean ratings for
+    each user, among the observed entries.
   \item If $X_{ij}^{E}$ is observed, replace it with $X_{ij}^{E} -
     \hat{b}_{i}$. If it is not observed, keep the entry equal to
     0. Call this centered version $\tilde{X}^{E}$.
   \item Compute the SVD of $\tilde{X}^{E}$, and let
     $P\left(\tilde{X}^{E}\right) = \sum_{k = 1}^{r}
-    u_{k}d_{k}v^{T}_{k}$ be the rank-$r$ approximation.
+    u_{k}d_{k}v^{T}_{k}$ be its rank-$r$ approximation.
   \item Make predictions based on $\hat{X} = b_{i}1_{p}^{T} +
     \frac{np}{\absarg{E}}P\left(\tilde{X}^{E}\right)$. The scaling
     factor $\frac{np}{\absarg{E}}$ accounts for the fact that entries
@@ -449,17 +450,19 @@ sound alike. Formally, we apply the following procedure.
 $\tilde{X}^{E}$ is large, but also sparse, so computation of the SVD
 is typically not too difficult.
 
-A second approach is to optimize the following criterion,
+A second approach to matrix completion is to optimize the following
+criterion,
 \begin{align*}
 \text{minimize}_{P \in \reals^{n \times r}, Q \in \reals^{p \times r}}
 &F\left(P, Q\right) := \sum_{\left(i, j\right) \in E} \left(\tilde{x}_{ij}^{E} -
   p_{i}^{T}q_{j}\right)^{2} + \lambda_{1}\sum_{i= 1}^{n}
 \|p_{i}\|_{2}^{2} + \lambda_{2} \sum_{j = 1}^{p} \|q_{j}\|_{2}^{2}.
 \end{align*}
-The problem no longer has a closed form solution, because we are
-summing only over observed entries. The standard approach is to
-perform gradient descent. The derivatives with respect to the $p_{i}$
-and $q_{i}$ are simple,
+The $p_{i}$ and $q_{i}$ are latent user and track factors,
+respectively. The problem no longer has a closed form solution,
+because we are summing only over observed entries. The standard
+approach is to perform gradient descent. The derivatives with respect
+to the $p_{i}$ and $q_{i}$ are simple,
 \begin{align}
 \frac{\partial F\left(P, Q\right)}{\partial p_{i}} &= \lambda_{1} p_{i} -
 \sum_{j \in E\left(i, \cdot\right)} \left(\tilde{x}_{ij}^{E} -
@@ -480,19 +483,19 @@ q_{j}^{t + 1} &= q_{j}^{t} - \gamma \frac{\partial F\left(P,
     Q\right)}{\partial q_{j}}.
 \end{align}
 
-for all $i$ and $j$. A common alternative -- especially in cases like
-the EMI data set, where there are many samples -- is to apply
-stochastic gradient descent. Here, only one element of the summand in
-the gradient is evaluated a time. There is no longer a guarantee that
-every step decreases the objective, but the computational savings of
-this approach can allow for many more iterations.
+for all $i$ and $j$. A common alternative -- especially when there are
+many samples -- is to apply stochastic gradient descent. Here, only
+one element of the summand in the gradient is evaluated a time. The
+descent path is ``rougher'', but the computational savings of this
+approach can allow for many more iterations in the same amount of
+time, which can improve the optimized objective.
 
 \subsection{Matrix Completion with Regressors}
 \label{sec:mat_compl_reg}
 
-With this formulation, it is natural to extend matrix completion to
-multiple tables. An extension that led to the best performance during
-the hackathon was based on the optimization \cite{shandaemi},
+It is easy to extend this idea to multiple tables. The approach that
+led to the best performance during the hackathon was based on the
+optimization \cite{shandaemi},
 \begin{align}
 \text{minimize}_{P \in \reals^{n \times r}, Q \in \reals^{p \times r},
   \beta \in \reals^{p}} &\sum_{\left(i, j\right) \in E}
@@ -511,12 +514,10 @@ In this section, we document an application of these methods to the
 EMI data set, as implemented in the \texttt{emi} package. I learned a
 bit in the process, but have only achieved mixed success in the actual
 prediction task. The matrix completion approach in \ref{sec:mat_compl}
-seems quite poor. The approach in section \ref{sec:mat_compl_reg}
-seems better, but I haven't tried to tune it very much, and it does
-not scale very well, not because of the optimization (which is in
-Rcpp), but because of the data reshaping to prepare the data for
-optimization. For future reference, it should be possible to reproduce
-the winning solution, since it is
+seems quite poor. The approach in Section \ref{sec:mat_compl_reg}
+seems better (though still worse than the baseline). For future
+reference, it should be possible to reproduce the winning solution,
+since it is
 \href{https://github.com/fancyspeed/codes_of_innovations_for_emi/tree/master/code_of_innovations}{available
   online}, but for the moment, I'm putting this work on hold.
 
@@ -532,7 +533,6 @@ with RMSEs about ten points worse than the mean baseline.
 \begin{figure}
 <<svd-model-plot>>=
 @
-\label{fig:svd_held_out}
 \caption{Predictions from the SVD approach described in section
   \ref{sec:mat_compl}, on a held out set of users. Some of the poor
   performance can be attributed to the prevalence of 0's -- these
@@ -541,11 +541,12 @@ with RMSEs about ten points worse than the mean baseline.
     algorithm has to provide results in the known $\left[0,
       100\right]$ range.). Even ignoring this, however, there doesn't
   seem to be any association between predictions and truth.}
+\label{fig:svd_held_out}
 \end{figure}
 
 What might be going on? To study the potential sources of error, we can
-look each step in the matrix completion machinery. The output below
-gives a small subview of the input and output of imputation.
+look each step in the matrix completion machinery. The printout below
+gives a small subview of the input and output of the approach.
 
 <<svd-model-study>>=
 @
@@ -561,10 +562,10 @@ better performance in this approach.
 \begin{figure}
 <<svd-model-study-scatter, fig.height = 4>>=
 @
-\label{fig:svd-model-scatter}
 \caption{Here we plot the predicted ratings $\hat{X}$ against the true
 ratings $X$ at observed entries $E$ (red) and unobserved entries
 $E^{C}$ (blue).}
+\label{fig:svd-model-scatter}
 \end{figure}
 
 \begin{figure}
@@ -572,24 +573,23 @@ $E^{C}$ (blue).}
 @
 \caption{This gives the histogram of the predicted ratings $\hat{X}$,
   across all users and tracks, not simply those at observed entries
-  $E$. That is, this gives a closer view at vertical blue bar at -1 in
-  figure \ref{fig:svd-model-scatter}}
+  $E$.}
 \label{fig:svd-model-histo}
 \end{figure}
 
 \subsubsection{Matrix Completion with Regressors}
 
 Next, we apply the approach that minimizes the
-objective \label{eq:mat_compl_regress}. I am still focusing on the
-10,000 users with the most ratings, so the problem is quite a bit
-easier than the problem studied in the actual hackathon.
+objective \ref{eq:mat_compl_regress}. I am still focusing on the
+10,000 users with the most ratings.
 
 The two preprocessing steps we apply are
 \begin{itemize}
-  \item SVD Imputation on \texttt{words} and \texttt{words}: We impute
-    missing values using the same approach as section
+  \item SVD Imputation on \texttt{words}: We impute
+    missing values using the same approach as in Section
     \ref{sec:baseline}. One subtlety is that we have to compute this
-    on the array $Z$; we accomplish this by imputing one slice at a time.
+    on the array $Z$; we accomplish this by imputing one slice at a
+    time.
   \item Scaling: We scale all the $Z$ covariates to the range
     $\left[0, 1\right]$, so that they are comparable from the view of
     the objective function.
@@ -599,8 +599,8 @@ We run a full cross-validation below. The performance is somewhat
 worse than that of the earlier baseline. Perhaps more systematic
 tuning or using more of the available data would help, but I'm a
 little surprised that the naive regression seems to have worked better
-than an optimization that is designed to take advantage of very
-specific structure in this problem.
+than an optimization that is designed to take advantage the very
+specific structure of this problem.
 
 <<svd-with-cov>>=
 @
@@ -615,15 +615,15 @@ specific structure in this problem.
 
 The cross-validation routine above doesn't actually save the model
 results from each iteration, and to get a sense of the estimated
-parameters, we re-estimate the model on the full data.
+parameters, we re-estimate the model.
 
-Below, we display a subview of the ratings matrix and covariates array
+Here is a subview of the ratings matrix and covariates array
 that are fed into the optimization.
 <<svd-with-cov-data>>=
 @
 
 \begin{figure}
-<<svd-with-cov-objective>>=
+<<svd-with-cov-obj>>=
 @
 \caption{Objective function from the gradient descent of the SVD with
   covariates algorithm.}
@@ -646,8 +646,8 @@ that are fed into the optimization.
 \caption{Coefficients $\beta$ associated with different
   covariates. The coefficients at the tails seem interesting, but the
   others outside the tails are probably just noise, since the
-  optimization with initialize with gaussian $beta$.}
-\label{fig:svd-cov-scores}
+  optimization with initialize with gaussian $\beta$.}
+\label{fig:svd-cov-beta}
 \end{figure}
 
 \section{Conclusion}
@@ -656,16 +656,18 @@ Our work so far has revolved around reproducing earlier predictive
 modeling efforts, to get a sense of the practice of machine
 learning. An idea that surfaced in a few disjoint places\footnote{For
   example, the different coefficient plots, and the (admittedly
-  half-baked) display of latent scores.}, but which was never really
-developed, was that these same efforts can serve as a prelude to
-interesting interpretive and inferential work. Of course, it would be
-silly to pretend to ``understand'' a data set like this, if it were
-not first possible to answer the most obvious question associated with
-it -- what makes someone like a song? -- but also too bad if that were
-as far the analysis went. What I mean is that, even though this is the
-end of my work on this data set for now, I suspect it will become an
-interesting testing ground for new multitable ideas that meld
-predictive and exploratory perspectives.
+  half-baked) display of latent scores: \ref{fig:vis-beta-shrink},
+  \ref{fig:svd-cov-scores}, and \ref{fig:svd-cov-beta}.}, but which
+was never really developed, was that these same efforts can serve as a
+prelude to interesting interpretive and inferential work. Of course,
+it would be silly to pretend to ``understand'' a data set like this,
+if it were not first possible to answer the most obvious question
+associated with it -- what makes someone like a song? -- but also too
+bad if that were as far the analysis went. What I mean is that, even
+though this is the end of my (somewhat underwhelming) work on this
+data set for now, I suspect it will become an interesting testing
+ground for new multitable ideas that combine predictive and
+exploratory ways of thinking.
 
 \section{Appendix}
 
