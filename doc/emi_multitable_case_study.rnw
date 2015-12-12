@@ -176,8 +176,8 @@ small_theme <- function(base_size = 7, base_family = "Helvetica") {
         plot.margin = unit(c(0.1, .1, .1, .1), "lines")
         )
 }
+a =1
 theme_set(small_theme())
-
 read_chunk("emi_multitable_case_study.R")
 @
 
@@ -373,7 +373,7 @@ This is a naive solution, which doesn't exploit the matrix completion
 structure of the true problem. It turns out that this is the best I
 can do, at least with my current implementations.
 \begin{figure}
-<<elnet-preds-plot, fig.show = "hold", fig.align = "left">>=
+<<elnet-preds-plot, fig.show = "hold">>=
 @
 \caption{To assess the performance of the baseline model, we can look
   at the predicted vs. true values on the training and test sets.}
@@ -390,9 +390,9 @@ see the RMSEs printed below, and also Figure
 @
 
 \begin{figure}
-<<baseline-with-shrink-fig, fig.show = "hold", fig.align = "left">>=
+<<baseline-with-shrink-fig, fig.show = "hold">>=
 @
-\caption{The performance of the baseline seems when we shrink towards
+\caption{The performance of the baseline when we shrink towards
   the peaks in the ratings histogram (this explains the empty
   horizontal bands). We are trying to take advantage of the fact that
   most survey respondents tended to rate songs using round numbers.}
@@ -523,7 +523,7 @@ since it is
 
 \subsubsection{Matrix Completion}
 
-Here is an implementation of the approach described in section
+Here is an implementation of the approach described in Section
 \ref{sec:mat_compl}. The predictions on held out data are quite poor,
 with RMSEs about ten points worse than the mean baseline.
 
@@ -533,7 +533,7 @@ with RMSEs about ten points worse than the mean baseline.
 \begin{figure}
 <<svd-model-plot>>=
 @
-\caption{Predictions from the SVD approach described in section
+\caption{Predictions from the SVD approach described in Section
   \ref{sec:mat_compl}, on a held out set of users. Some of the poor
   performance can be attributed to the prevalence of 0's -- these
   are caused by truncating the imputation results at the lowest

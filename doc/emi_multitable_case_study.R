@@ -126,12 +126,16 @@ RMSE(training_errs[, 1], training_errs[, 2]) # training error
 ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
+  xlim(c(0, 100)) +
+  ylim(c(0, 100)) +
   coord_fixed() +
   ggtitle("Training Errors for Benchmark Model")
 
 ggplot((glmnet_res$pred_pairs[[1]])) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
+  xlim(c(0, 100)) +
+  ylim(c(0, 100)) +
   coord_fixed() +
   ggtitle("Test Errors for Benchmark Model [Fold 1]")
 
@@ -150,12 +154,16 @@ ggplot(training_errs) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
+  xlim(c(0, 100)) +
+  ylim(c(0, 100)) +
   ggtitle("Training Errors for Benchmark Model, with Shrinkage")
 
 ggplot((glmnet_res_shrink$pred_pairs[[1]])) +
   geom_point(aes(x = y, y = y_hat), alpha = 0.1) +
   geom_abline(b = 1, a = 0, col = "red", alpha = 0.6) +
   coord_fixed() +
+  xlim(c(0, 100)) +
+  ylim(c(0, 100)) +
   ggtitle("Test Errors for Benchmark Model, with Shrinkage [held out fold 1]")
 
 ## ---- vis-beta-shrink ----
@@ -210,14 +218,13 @@ ggplot(melt(svd_preds_study, id.vars = c("Var1", "Var2", "test"))) +
   facet_grid(variable ~ ., scale = "free_y") +
   ggtitle("SVD Imputation, Truth and Predictions")
 
-head(svd_preds_study)
-
 ## ---- svd-with-cov ----
 opts <- merge_svd_cov_opts(list(lambdas = c(0.0001, 0.0001, .01),
                                 gamma_pq = 0.001, gamma_beta = 5e-6,
                                 n_iter = 20, verbose = TRUE))
 svd_cov_results <- evaluate(data_list, svd_cov_train, opts, svd_cov_predict)
 svd_cov_results
+b = 1
 
 ## ---- svd-with-cov-scatter ----
 ggplot(svd_cov_results$pred_pairs[[1]]) +
@@ -225,6 +232,7 @@ ggplot(svd_cov_results$pred_pairs[[1]]) +
   geom_abline(aes(slope = 1, intercept = 0), col = "red", alpha = 0.6) +
   coord_fixed() +
   ggtitle("Predictions from SVD with Covariates [Fold 1]")
+b = 1
 
 ## ---- svd-with-cov-data ----
 # we can dissect the pieces of this prediction
